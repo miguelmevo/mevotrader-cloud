@@ -1,0 +1,8 @@
+config.json
+*.session
+*.session-journal
+.env
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store

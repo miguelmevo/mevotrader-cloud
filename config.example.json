@@ -1,0 +1,28 @@
+{
+  "telegram": {
+    "api_id": "TU_API_ID",
+    "api_hash": "TU_API_HASH",
+    "source_channel": 0,
+    "bot_token": "TOKEN_DEL_BOT",
+    "admin_chat_id": "TU_CHAT_ID"
+  },
+  "mt5": {
+    "login": 0,
+    "password": "TU_PASSWORD",
+    "server": "TU_BROKER_SERVER",
+    "symbol_suffix": "",
+    "magic_number": 20240101
+  },
+  "ea": {
+    "host": "IP_DEL_VPS",
+    "port": 8080,
+    "secret": "CLAVE_SECRETA"
+  },
+  "trading": {
+    "lot_mode": "fixed",
+    "lot_fixed": 0.10,
+    "lot_percent": 1.0,
+    "confirmation_timeout_seconds": 60,
+    "close_requires_confirmation": false
+  }
+}

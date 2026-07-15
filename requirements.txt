@@ -1,0 +1,4 @@
+telethon>=1.36
+python-telegram-bot>=21.0
+fastapi>=0.111
+uvicorn>=0.29

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MevoTrader — Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;font-size:14px}
+a{color:#58a6ff;text-decoration:none}
+.topbar{background:#161b22;border-bottom:1px solid #30363d;padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.topbar-title{font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:#3fb950;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.dot.red{background:#f85149;animation:none}
+.dot.yellow{background:#d29922;animation:none}
+.status-chips{display:flex;gap:8px}
+.chip{font-size:12px;padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:5px;border:1px solid #30363d;background:#21262d}
+.chip.ok{border-color:#238636;color:#3fb950}
+.chip.err{border-color:#6e2e2e;color:#f85149}
+.chip.warn{border-color:#6e4c1e;color:#d29922}
+.container{max-width:1100px;margin:0 auto;padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.card{background:#161b22;border:1px solid #30363d;border-radius:10px;overflow:hidden}
+.card-full{grid-column:1/-1}
+.card-header{padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between}
+.card-header h2{font-size:13px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.5px}
+.card-body{padding:16px 18px}
+input[type=text],textarea,select{background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;font-size:13px;padding:7px 10px;width:100%;outline:none;font-family:inherit}
+input[type=text]:focus,textarea:focus{border-color:#58a6ff}
+textarea{resize:vertical;min-height:120px;font-family:'SF Mono',Consolas,monospace;font-size:12px}
+button{background:#21262d;border:1px solid #30363d;border-radius:6px;color:#e6edf3;cursor:pointer;font-size:13px;padding:7px 14px;transition:background .15s}
+button:hover{background:#30363d}
+button.primary{background:#238636;border-color:#2ea043;color:#fff}
+button.primary:hover{background:#2ea043}
+button.danger{background:#6e2e2e;border-color:#8b3a3a;color:#f85149}
+button.danger:hover{background:#8b3a3a}
+.row{display:flex;gap:8px;align-items:center}
+.channel-list{list-style:none}
+.channel-item{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #21262d}
+.channel-item:last-child{border-bottom:none}
+.channel-id{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:#58a6ff}
+.channel-name{font-size:13px;color:#e6edf3}
+.channel-source{font-size:11px;color:#8b949e;margin-left:6px}
+.parse-result{margin-top:14px;border-radius:6px;padding:12px 14px;font-family:'SF Mono',Consolas,monospace;font-size:12px;line-height:1.7;display:none}
+.parse-result.ok{background:#0d2818;border:1px solid #238636;color:#3fb950}
+.parse-result.err{background:#2d1117;border:1px solid #6e2e2e;color:#f85149}
+.log-feed{font-family:'SF Mono',Consolas,monospace;font-size:11px;color:#8b949e;line-height:1.8;max-height:200px;overflow-y:auto}
+.log-feed .ts{color:#3fb950}
+.log-feed .signal-buy{color:#58a6ff}
+.log-feed .signal-sell{color:#f85149}
+.log-feed .info{color:#8b949e}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:0}
+.stat{background:#0d1117;border-radius:8px;padding:12px 14px}
+.stat-label{font-size:11px;color:#8b949e;margin-bottom:4px}
+.stat-value{font-size:22px;font-weight:600;color:#e6edf3}
+.stat-value.green{color:#3fb950}
+.stat-value.red{color:#f85149}
+.empty{color:#8b949e;font-size:13px;text-align:center;padding:20px 0}
+.badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600}
+.badge.buy{background:#0d2818;color:#3fb950;border:1px solid #238636}
+.badge.sell{background:#2d1117;color:#f85149;border:1px solid #6e2e2e}
+.badge.close{background:#1c1f2b;color:#8b949e;border:1px solid #30363d}
+#add-form{display:none;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #30363d}
+.img-drop{border:2px dashed #30363d;border-radius:8px;min-height:120px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;transition:border-color .2s,background .2s;overflow:hidden}
+.img-drop:hover,.img-drop.over{border-color:#58a6ff;background:#0d1f33}
+.img-drop-inner{text-align:center;font-size:13px;color:#8b949e;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px}
+.img-drop.has-img .img-drop-inner{display:none}
+.img-drop.has-img img{display:block!important}
+@media(max-width:700px){.card-body[style*="grid"]{grid-template-columns:1fr!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">
+    <div class="dot" id="tg-dot"></div>
+    MevoTrader
+  </div>
+  <div class="status-chips">
+    <div class="chip" id="chip-telethon">Telethon —</div>
+    <div class="chip" id="chip-bot">Bot —</div>
+    <div class="chip" id="chip-ea">EA —</div>
+    <button id="btn-confirm" onclick="toggleConfirm()" style="font-size:12px;padding:3px 12px;border-radius:20px;border:1px solid #238636;background:#0d2818;color:#3fb950;cursor:pointer">✋ Con confirmación</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Estadísticas</h2>
+      <button onclick="loadStatus()" style="padding:4px 10px;font-size:12px">↺ Actualizar</button>
+    </div>
+    <div class="card-body">
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-label">Señales recibidas</div><div class="stat-value" id="stat-signals">—</div></div>
+        <div class="stat"><div class="stat-label">Ejecutadas</div><div class="stat-value green" id="stat-executed">—</div></div>
+        <div class="stat"><div class="stat-label">Pendiente EA</div><div class="stat-value" id="stat-pending">—</div></div>
+        <div class="stat"><div class="stat-label">Canales activos</div><div class="stat-value green" id="stat-channels">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Señales recientes</h2>
+    </div>
+    <div class="card-body" id="signal-history" style="padding:0">
+      <div class="empty" style="padding:16px 18px">Sin señales aún</div>
+    </div>
+  </div>
+
+  <div class="card card-full">
+    <div class="card-header">
+      <h2>Canales monitoreados</h2>
+      <button onclick="toggleAddForm()" style="padding:4px 10px;font-size:12px" id="add-btn">+ Agregar</button>
+    </div>
+    <div class="card-body">
+      <div id="add-form" class="row">
+        <input type="text" id="new-channel-id" placeholder="ID del canal (ej: -1001234567890)" style="flex:1">
+        <input type="text" id="new-channel-name" placeholder="Nombre (ej: LumyArena)" style="flex:1">
+        <button class="primary" onclick="addChannel()">Agregar</button>
+        <button onclick="toggleAddForm()">Cancelar</button>
+      </div>
+      <ul class="channel-list" id="channel-list">
+        <li class="empty">Cargando...</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card card-full">
+    <div class="card-header">
+      <h2>Probar mensaje</h2>
+      <span style="font-size:11px;color:#8b949e">Pega una imagen del grupo o escribe el texto del mensaje</span>
+    </div>
+    <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+      <!-- APERTURA -->
+      <div class="tester-col">
+        <div style="font-size:12px;font-weight:600;color:#3fb950;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#3fb950;display:inline-block"></span>
+          SEÑAL DE APERTURA
+        </div>
+        <div class="img-drop" id="drop-open" onclick="document.getElementById('file-open').click()" ondrop="handleDrop(event,'open')" ondragover="event.preventDefault()" onpaste="handlePasteZone(event,'open')">
+          <div class="img-drop-inner" id="drop-open-inner">
+            <div style="font-size:22px">📷</div>
+            <div>Haz clic, pega (Ctrl+V) o arrastra</div>
+            <div style="font-size:11px;color:#8b949e">una captura del grupo</div>
+          </div>
+          <img id="preview-open" style="display:none;max-width:100%;max-height:180px;border-radius:4px;object-fit:contain">
+        </div>
+        <input type="file" id="file-open" accept="image/*" style="display:none" onchange="handleFile(event,'open')">
+        <textarea id="msg-open" placeholder="O pega aquí el texto del mensaje de apertura...
+Ej:
+Trader acaba de abrir una posición
+XAUUSD — BUY 0.10 lots
+Precio: 3320.50" style="margin-top:10px;min-height:100px"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="primary" onclick="testParseSection('open')" style="flex:1">▶ Probar apertura</button>
+          <button onclick="clearSection('open')" title="Limpiar">✕ Limpiar</button>
+        </div>
+        <div class="parse-result" id="result-open"></div>
+      </div>
+
+      <!-- CIERRE -->
+      <div class="tester-col">
+        <div style="font-size:12px;font-weight:600;color:#f85149;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span style="width:8px;height:8px;border-radius:50%;background:#f85149;display:inline-block"></span>
+          SEÑAL DE CIERRE
+        </div>
+        <div class="img-drop" id="drop-close" onclick="document.getElementById('file-close').click()" ondrop="handleDrop(event,'close')" ondragover="event.preventDefault()" onpaste="handlePasteZone(event,'close')">
+          <div class="img-drop-inner" id="drop-close-inner">
+            <div style="font-size:22px">📷</div>
+            <div>Haz clic, pega (Ctrl+V) o arrastra</div>
+            <div style="font-size:11px;color:#8b949e">una captura del grupo</div>
+          </div>
+          <img id="preview-close" style="display:none;max-width:100%;max-height:180px;border-radius:4px;object-fit:contain">
+        </div>
+        <input type="file" id="file-close" accept="image/*" style="display:none" onchange="handleFile(event,'close')">
+        <textarea id="msg-close" placeholder="O pega aquí el texto del mensaje de cierre...
+Ej:
+Trader acaba de cerrar una posición
+XAUUSD — BUY 0.10 lots
+Precio de apertura: 3310.00
+Precio de cierre: 3320.50
+Variación: +10.5 pips
+Beneficio: +$105.00" style="margin-top:10px;min-height:100px"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="primary" onclick="testParseSection('close')" style="flex:1">▶ Probar cierre</button>
+          <button onclick="clearSection('close')" title="Limpiar">✕ Limpiar</button>
+        </div>
+        <div class="parse-result" id="result-close"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="card card-full">
+    <div class="card-header">
+      <h2>Actividad reciente</h2>
+      <button onclick="loadLogs()" style="padding:4px 10px;font-size:12px">↺</button>
+    </div>
+    <div class="card-body">
+      <div class="log-feed" id="log-feed"><span class="info">Cargando...</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SECRET = new URLSearchParams(location.search).get('secret') || '';
+const BASE = '';
+
+async function api(path, opts={}) {
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await fetch(BASE + path + sep + 'secret=' + SECRET, opts);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function loadStatus() {
+  try {
+    const s = await api('/api/status');
+    document.getElementById('stat-signals').textContent  = s.signals_today ?? '0';
+    document.getElementById('stat-executed').textContent = s.signals_executed ?? '0';
+    document.getElementById('stat-pending').textContent  = s.pending_for_ea ? '1' : '0';
+    document.getElementById('stat-channels').textContent = s.channels_count ?? '0';
+
+    const tDot = document.getElementById('tg-dot');
+    const cTelethon = document.getElementById('chip-telethon');
+    const cBot = document.getElementById('chip-bot');
+    const cEa = document.getElementById('chip-ea');
+
+    tDot.className = 'dot' + (s.telethon_connected ? '' : ' red');
+    setChip(cTelethon, 'Telethon', s.telethon_connected);
+    setChip(cBot, 'Bot', s.bot_running);
+    setChip(cEa, 'EA', !!s.pending_for_ea, true);
+
+    if (s.signal_history && s.signal_history.length > 0) renderSignalHistory(s.signal_history);
+    else if (s.last_signal) renderSignalHistory([s.last_signal]);
+    updateConfirmBtn(s.confirm_required !== false);
+
+    const btn = document.getElementById('btn-pause');
+    if (s.signals_paused) {
+      btn.textContent = '▶ Reactivar';
+      btn.style.borderColor = '#d29922';
+      btn.style.color = '#d29922';
+    } else {
+      btn.textContent = '⏸ Pausar';
+      btn.style.borderColor = '#30363d';
+      btn.style.color = '#e6edf3';
+    }
+  } catch(e) {
+    document.getElementById('chip-telethon').className = 'chip err';
+    document.getElementById('chip-telethon').textContent = 'Sin conexión';
+  }
+}
+
+async function toggleConfirm() {
+  try {
+    const data = await api('/api/confirm/toggle', {method: 'POST'});
+    updateConfirmBtn(data.confirm_required);
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+function updateConfirmBtn(required) {
+  const btn = document.getElementById('btn-confirm');
+  if (!btn) return;
+  if (required) {
+    btn.textContent = '✋ Con confirmación';
+    btn.style.borderColor = '#238636';
+    btn.style.background  = '#0d2818';
+    btn.style.color       = '#3fb950';
+  } else {
+    btn.textContent = '⚡ Auto-aprobar';
+    btn.style.borderColor = '#d29922';
+    btn.style.background  = '#2a1f00';
+    btn.style.color       = '#d29922';
+  }
+}
+
+async function toggleChannel(id) {
+  try {
+    const data = await api(`/api/channels/${id}/toggle`, {method: 'POST'});
+    const btn = document.getElementById('toggle-' + id);
+    if (!btn) return;
+    if (data.active) {
+      btn.textContent = '● Activo';
+      btn.style.borderColor = '#238636';
+      btn.style.background = '#0d2818';
+      btn.style.color = '#3fb950';
+    } else {
+      btn.textContent = '⏸ Pausado';
+      btn.style.borderColor = '#6e2e2e';
+      btn.style.background = '#2d1117';
+      btn.style.color = '#f85149';
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+function setChip(el, label, ok, neutral=false) {
+  el.className = 'chip ' + (neutral ? '' : (ok ? 'ok' : 'err'));
+  el.textContent = label + ': ' + (ok ? '✓' : '✗');
+}
+
+function renderSignalHistory(history) {
+  const el = document.getElementById('signal-history');
+  if (!history || history.length === 0) {
+    el.innerHTML = '<div class="empty" style="padding:16px 18px">Sin señales aún</div>';
+    return;
+  }
+  el.innerHTML = history.map((sig, i) => {
+    const dir = sig.direction || '';
+    const cls = sig.action === 'close' ? 'close' : (dir === 'BUY' ? 'buy' : 'sell');
+    const sl  = sig.sl && sig.sl > 0 ? `<span style="color:#f85149;margin-left:8px">SL ${sig.sl}</span>` : '';
+    const tp  = sig.tp && sig.tp > 0 ? `<span style="color:#3fb950;margin-left:8px">TP ${sig.tp}</span>` : '';
+    const statusColor = sig.status === 'aprobada' || sig.status === 'auto-aprobada' ? '#3fb950'
+                      : sig.status === 'rechazada' ? '#f85149' : '#d29922';
+    const border = i < history.length - 1 ? 'border-bottom:1px solid #21262d' : '';
+    return `
+      <div style="padding:12px 18px;${border}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge ${cls}">${sig.action === 'close' ? 'CLOSE' : dir}</span>
+            <span style="font-weight:600">${sig.symbol || '—'}</span>
+            <span style="color:#e6edf3;font-size:13px">${sig.pe || '—'}</span>
+            ${sl}${tp}
+          </div>
+          <span style="font-size:11px;color:#8b949e;font-family:monospace">${sig.time || ''}</span>
+        </div>
+        <div style="font-size:11px;color:#8b949e">
+          <span style="color:#58a6ff">${sig.trader || '—'}</span>
+          <span style="margin:0 6px">·</span>
+          <span style="color:${statusColor}">${sig.status || 'pendiente'}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderLastSignal(sig) { renderSignalHistory([sig]); }
+
+async function loadChannels() {
+  try {
+    const data = await api('/api/channels');
+    const list = document.getElementById('channel-list');
+    if (!data.channels || data.channels.length === 0) {
+      list.innerHTML = '<li class="empty">No hay canales configurados</li>';
+      return;
+    }
+    list.innerHTML = data.channels.map(ch => {
+      const active = ch.active !== false;
+      const isDynamic = ch.source !== 'env';
+      const toggleBtn = isDynamic ? `
+        <button onclick="toggleChannel(${ch.id})" id="toggle-${ch.id}"
+          style="padding:4px 10px;font-size:12px;border-radius:6px;border:1px solid ${active ? '#238636' : '#6e2e2e'};background:${active ? '#0d2818' : '#2d1117'};color:${active ? '#3fb950' : '#f85149'};cursor:pointer">
+          ${active ? '● Activo' : '⏸ Pausado'}
+        </button>
+        <button class="danger" style="padding:4px 10px;font-size:12px;margin-left:4px" onclick="removeChannel(${ch.id})">Quitar</button>` :
+        '<span style="font-size:11px;color:#8b949e">Railway var</span>';
+      return `
+      <li class="channel-item">
+        <div>
+          <span class="channel-name">${ch.name || 'Sin nombre'}</span>
+          <span class="channel-source">${ch.source === 'env' ? '(variable env)' : ''}</span><br>
+          <span class="channel-id">${ch.id}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">${toggleBtn}</div>
+      </li>`;
+    }).join('');
+    document.getElementById('stat-channels').textContent = data.channels.length;
+  } catch(e) {
+    document.getElementById('channel-list').innerHTML = '<li class="empty">Error cargando canales</li>';
+  }
+}
+
+function toggleAddForm() {
+  const f = document.getElementById('add-form');
+  f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
+}
+
+async function addChannel() {
+  const id = document.getElementById('new-channel-id').value.trim();
+  const name = document.getElementById('new-channel-name').value.trim();
+  if (!id) return;
+  try {
+    await api('/api/channels', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({id: parseInt(id), name: name || id})
+    });
+    document.getElementById('new-channel-id').value = '';
+    document.getElementById('new-channel-name').value = '';
+    toggleAddForm();
+    loadChannels();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function removeChannel(id) {
+  try {
+    await api('/api/channels/' + id, {method:'DELETE'});
+    loadChannels();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+function setImage(section, src) {
+  const drop = document.getElementById('drop-' + section);
+  const img  = document.getElementById('preview-' + section);
+  img.src = src;
+  drop.classList.add('has-img');
+}
+
+function handleFile(evt, section) {
+  const file = evt.target.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => setImage(section, e.target.result);
+  reader.readAsDataURL(file);
+}
+
+function handleDrop(evt, section) {
+  evt.preventDefault();
+  const drop = document.getElementById('drop-' + section);
+  drop.classList.remove('over');
+  const file = evt.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = e => setImage(section, e.target.result);
+    reader.readAsDataURL(file);
+  }
+}
+
+function handlePasteZone(evt, section) {
+  const items = (evt.clipboardData || evt.originalEvent?.clipboardData)?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      evt.preventDefault();
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = e => setImage(section, e.target.result);
+      reader.readAsDataURL(blob);
+      return;
+    }
+  }
+}
+
+// Global paste: detect which section is active or apply to both
+document.addEventListener('paste', function(evt) {
+  const items = (evt.clipboardData || evt.originalEvent?.clipboardData)?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      // Find the section whose drop zone or textarea last had focus
+      const active = document.activeElement;
+      let section = null;
+      if (active && active.id) {
+        if (active.id.includes('open'))  section = 'open';
+        if (active.id.includes('close')) section = 'close';
+      }
+      if (!section) section = 'open'; // default
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = e => setImage(section, e.target.result);
+      reader.readAsDataURL(blob);
+      return;
+    }
+  }
+});
+
+// Drag over highlight
+['open','close'].forEach(s => {
+  const el = document.getElementById('drop-' + s);
+  if (el) {
+    el.addEventListener('dragenter', () => el.classList.add('over'));
+    el.addEventListener('dragleave', () => el.classList.remove('over'));
+  }
+});
+
+function clearSection(section) {
+  document.getElementById('msg-' + section).value = '';
+  document.getElementById('result-' + section).style.display = 'none';
+  document.getElementById('result-' + section).className = 'parse-result';
+  const drop = document.getElementById('drop-' + section);
+  drop.classList.remove('has-img');
+  const img = document.getElementById('preview-' + section);
+  img.src = '';
+  const fileInput = document.getElementById('file-' + section);
+  if (fileInput) fileInput.value = '';
+}
+
+async function testParseSection(section) {
+  const text = document.getElementById('msg-' + section).value;
+  const res  = document.getElementById('result-' + section);
+  if (!text.trim()) {
+    res.style.display = 'block';
+    res.className = 'parse-result err';
+    res.textContent = '⚠ Escribe o pega el texto del mensaje primero';
+    return;
+  }
+  res.style.display = 'block';
+  res.className = 'parse-result';
+  res.textContent = 'Analizando...';
+  try {
+    const data = await api('/debug/parse', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    });
+    if (data.parsed) {
+      res.className = 'parse-result ok';
+      const sig = data.signal;
+      res.textContent = '✓ Señal reconocida\n\n'
+        + `Formato:   ${sig.format || '—'}\n`
+        + `Tipo:      ${sig.type}\n`
+        + `Símbolo:   ${sig.symbol}\n`
+        + `Dirección: ${sig.direction || '—'}\n`
+        + `Precio:    ${sig.price ?? '—'}\n`
+        + `SL:        ${sig.sl ?? '—'}\n`
+        + `TP:        ${sig.tp ?? '—'}\n`
+        + `Lotes:     ${sig.lots ?? '—'}`;
+    } else {
+      res.className = 'parse-result err';
+      res.textContent = '✗ No reconocido\n\nMotivo: ' + data.reason
+        + '\n\nFormatos soportados:\n'
+        + '  [LumyArena]\n'
+        + '  Trader acaba de abrir una posición\n'
+        + '  SYMBOL — BUY/SELL X lots | Precio: 0000.00\n\n'
+        + '  [Veritas / Genérico]\n'
+        + '  BUY TRADE XAUUSD\n'
+        + '  ENTRY: 0000 | SL: 0000 | TP: 0000 o OPEN';
+    }
+  } catch(e) {
+    res.className = 'parse-result err';
+    res.textContent = 'Error: ' + e.message
+      + (e.message === '403' ? '\n→ Verifica el secret en la URL (?secret=...)' : '');
+  }
+}
+
+async function loadLogs() {
+  try {
+    const data = await api('/api/logs');
+    const feed = document.getElementById('log-feed');
+    if (!data.logs || data.logs.length === 0) {
+      feed.innerHTML = '<span class="info">Sin actividad registrada</span>';
+      return;
+    }
+    feed.innerHTML = data.logs.slice().reverse().map(l => {
+      const cls = l.includes('BUY') ? 'signal-buy' : l.includes('SELL') || l.includes('CLOSE') ? 'signal-sell' : 'info';
+      const parts = l.split(' ', 2);
+      return `<div><span class="ts">${parts[0] || ''}</span> <span class="${cls}">${l.slice((parts[0]||'').length + 1)}</span></div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+if (!SECRET) {
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px">
+    <div style="font-size:18px;font-weight:600">MevoTrader Dashboard</div>
+    <div style="color:#8b949e;font-size:14px">Accede con tu secret:</div>
+    <code style="background:#161b22;border:1px solid #30363d;padding:8px 16px;border-radius:6px;color:#58a6ff">
+      ${location.href.split('?')[0]}?secret=mevo2024secretkey
+    </code>
+  </div>`;
+} else {
+  loadStatus();
+  loadChannels();
+  loadLogs();
+  setInterval(loadStatus, 10000);
+  setInterval(loadLogs, 15000);
+}
+</script>
+</body>
+</html>
