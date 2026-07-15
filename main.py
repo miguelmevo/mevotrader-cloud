@@ -43,6 +43,18 @@ def load_config() -> dict:
         return cfg
 
     log.info("config.json no encontrado — usando variables de entorno")
+    # TG_CHANNEL_NAMES = "-100123:LumyArena,-100456:OtroCanal"
+    channel_names: dict[int, str] = {}
+    raw_names = os.environ.get("TG_CHANNEL_NAMES", "")
+    for part in raw_names.split(","):
+        part = part.strip()
+        if ":" in part:
+            cid, cname = part.split(":", 1)
+            try:
+                channel_names[int(cid.strip())] = cname.strip()
+            except ValueError:
+                pass
+
     return {
         "telegram": {
             "api_id":         os.environ["TG_API_ID"],
@@ -50,6 +62,7 @@ def load_config() -> dict:
             "source_channel": [int(x.strip()) for x in os.environ["TG_SOURCE_CHANNEL"].split(",")],
             "bot_token":      os.environ["TG_BOT_TOKEN"],
             "admin_chat_id":  os.environ["TG_ADMIN_CHAT_ID"],
+            "channel_names":  channel_names,
         },
         "mt5": {
             "symbol_suffix": os.environ.get("MT5_SYMBOL_SUFFIX", ""),
@@ -349,7 +362,8 @@ def _make_handler(client: TelegramClient):
         if chat_id in extra_channels:
             channel_name = extra_channels[chat_id].get("name", str(chat_id))
         else:
-            channel_name = str(chat_id)
+            env_names = cfg["telegram"].get("channel_names", {})
+            channel_name = env_names.get(chat_id, str(chat_id))
 
         log.info("Señal: %s %s %s canal=%s", signal.type.value, resolved, signal.direction, channel_name)
 
