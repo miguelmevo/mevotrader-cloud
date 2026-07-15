@@ -242,7 +242,7 @@ async def debug_parse(body: dict, secret: str = Query(...)):
 # -------------------------------------------------------------------
 # Confirmación via Telegram bot
 # -------------------------------------------------------------------
-async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str):
+async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, channel_name: str = "—"):
     global last_signal, signals_today
     callback_id = str(uuid.uuid4())[:8]
 
@@ -256,8 +256,11 @@ async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str):
         "pe":        signal.price,
         "status":    "pendiente",
         "trader":    signal.trader,
+        "channel":   channel_name,
     }
-    signal_data["time"] = datetime.utcnow().strftime("%H:%M")
+    now = datetime.utcnow()
+    signal_data["time"]     = now.strftime("%H:%M")
+    signal_data["datetime"] = now.strftime("%d/%m/%Y %H:%M")
     pending_for_user[callback_id] = signal_data
     last_signal = signal_data
     signal_history.append(signal_data)
@@ -342,12 +345,19 @@ def _make_handler(client: TelegramClient):
         base     = signal.symbol_raw.split(".")[0]
         resolved = base + symbol_suffix
 
-        log.info("Señal: %s %s %s", signal.type.value, resolved, signal.direction)
+        # Nombre del canal origen
+        if chat_id in extra_channels:
+            channel_name = extra_channels[chat_id].get("name", str(chat_id))
+        else:
+            channel_name = str(chat_id)
+
+        log.info("Señal: %s %s %s canal=%s", signal.type.value, resolved, signal.direction, channel_name)
 
         if signal.type == SignalType.OPEN:
             if confirm_required:
-                asyncio.create_task(send_confirmation(_bot_ref, signal, resolved))
+                asyncio.create_task(send_confirmation(_bot_ref, signal, resolved, channel_name))
             else:
+                now = datetime.utcnow()
                 pending_for_ea = {
                     "id":        str(uuid.uuid4())[:8],
                     "action":    "open",
@@ -358,7 +368,9 @@ def _make_handler(client: TelegramClient):
                     "pe":        signal.price,
                     "status":    "auto-aprobada",
                     "trader":    signal.trader,
-                    "time":      datetime.utcnow().strftime("%H:%M"),
+                    "channel":   channel_name,
+                    "time":      now.strftime("%H:%M"),
+                    "datetime":  now.strftime("%d/%m/%Y %H:%M"),
                 }
                 last_signal = pending_for_ea
                 signal_history.append(pending_for_ea)

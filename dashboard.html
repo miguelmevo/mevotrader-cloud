@@ -103,10 +103,10 @@ button.danger:hover{background:#8b3a3a}
 
   <div class="card">
     <div class="card-header">
-      <h2>Señales recientes</h2>
+      <h2>Última señal</h2>
     </div>
-    <div class="card-body" id="signal-history" style="padding:0">
-      <div class="empty" style="padding:16px 18px">Sin señales aún</div>
+    <div class="card-body" id="last-signal-card">
+      <div class="empty">Sin señales aún</div>
     </div>
   </div>
 
@@ -236,8 +236,8 @@ async function loadStatus() {
     setChip(cBot, 'Bot', s.bot_running);
     setChip(cEa, 'EA', !!s.pending_for_ea, true);
 
-    if (s.signal_history && s.signal_history.length > 0) renderSignalHistory(s.signal_history);
-    else if (s.last_signal) renderSignalHistory([s.last_signal]);
+    const lastSig = s.signal_history && s.signal_history.length > 0 ? s.signal_history[0] : s.last_signal;
+    renderLastSignalCard(lastSig);
     updateConfirmBtn(s.confirm_required !== false);
 
     const btn = document.getElementById('btn-pause');
@@ -305,41 +305,34 @@ function setChip(el, label, ok, neutral=false) {
   el.textContent = label + ': ' + (ok ? '✓' : '✗');
 }
 
-function renderSignalHistory(history) {
-  const el = document.getElementById('signal-history');
-  if (!history || history.length === 0) {
-    el.innerHTML = '<div class="empty" style="padding:16px 18px">Sin señales aún</div>';
+function renderLastSignalCard(sig) {
+  const el = document.getElementById('last-signal-card');
+  if (!sig) {
+    el.innerHTML = '<div class="empty">Sin señales aún</div>';
     return;
   }
-  el.innerHTML = history.map((sig, i) => {
-    const dir = sig.direction || '';
-    const cls = sig.action === 'close' ? 'close' : (dir === 'BUY' ? 'buy' : 'sell');
-    const sl  = sig.sl && sig.sl > 0 ? `<span style="color:#f85149;margin-left:8px">SL ${sig.sl}</span>` : '';
-    const tp  = sig.tp && sig.tp > 0 ? `<span style="color:#3fb950;margin-left:8px">TP ${sig.tp}</span>` : '';
-    const statusColor = sig.status === 'aprobada' || sig.status === 'auto-aprobada' ? '#3fb950'
-                      : sig.status === 'rechazada' ? '#f85149' : '#d29922';
-    const border = i < history.length - 1 ? 'border-bottom:1px solid #21262d' : '';
-    return `
-      <div style="padding:12px 18px;${border}">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span class="badge ${cls}">${sig.action === 'close' ? 'CLOSE' : dir}</span>
-            <span style="font-weight:600">${sig.symbol || '—'}</span>
-            <span style="color:#e6edf3;font-size:13px">${sig.pe || '—'}</span>
-            ${sl}${tp}
-          </div>
-          <span style="font-size:11px;color:#8b949e;font-family:monospace">${sig.time || ''}</span>
-        </div>
-        <div style="font-size:11px;color:#8b949e">
-          <span style="color:#58a6ff">${sig.trader || '—'}</span>
-          <span style="margin:0 6px">·</span>
-          <span style="color:${statusColor}">${sig.status || 'pendiente'}</span>
-        </div>
-      </div>`;
-  }).join('');
+  const dir = sig.direction || '';
+  const cls = sig.action === 'close' ? 'close' : (dir === 'BUY' ? 'buy' : 'sell');
+  const statusColor = sig.status === 'aprobada' || sig.status === 'auto-aprobada' ? '#3fb950'
+                    : sig.status === 'rechazada' ? '#f85149' : '#d29922';
+  const rows = [
+    ['Símbolo',   `<span style="font-weight:600;color:#e6edf3">${sig.symbol || '—'}</span> &nbsp;<span class="badge ${cls}">${sig.action === 'close' ? 'CLOSE' : dir}</span>`],
+    ['Precio',    sig.pe || '—'],
+    ['SL',        sig.sl && sig.sl > 0 ? `<span style="color:#f85149">${sig.sl}</span>` : '—'],
+    ['TP',        sig.tp && sig.tp > 0 ? `<span style="color:#3fb950">${sig.tp}</span>` : '—'],
+    ['Origen',    `<span style="color:#58a6ff">${sig.channel || sig.trader || '—'}</span>`],
+    ['Trader',    sig.trader || '—'],
+    ['Fecha',     sig.datetime || sig.time || '—'],
+    ['Estado',    `<span style="color:${statusColor}">${sig.status || 'pendiente'}</span>`],
+  ];
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse">` +
+    rows.map(([label, val]) => `
+      <tr style="border-bottom:1px solid #21262d">
+        <td style="padding:8px 4px;color:#8b949e;font-size:12px;width:72px;white-space:nowrap">${label}</td>
+        <td style="padding:8px 4px;font-size:13px">${val}</td>
+      </tr>`).join('') +
+    `</table>`;
 }
-
-function renderLastSignal(sig) { renderSignalHistory([sig]); }
 
 async function loadChannels() {
   try {
