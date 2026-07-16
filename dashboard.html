@@ -123,7 +123,7 @@ button.danger:hover{background:#8b3a3a}
 
   <div class="card">
     <div class="card-header">
-      <h2>Última señal</h2>
+      <h2>Último Setup</h2>
     </div>
     <div class="card-body" id="last-signal-card">
       <div class="empty">Sin señales aún</div>
@@ -349,7 +349,7 @@ function renderLastSignalCard(sig) {
     ['Origen',  `<span style="color:#58a6ff">${sig.channel || sig.trader || '—'}</span>`],
     ['Trader',  sig.trader || '—'],
     ['Fecha',   sig.datetime || sig.time || '—'],
-    ['Estado',  `<span style="color:${statusColor}">${sig.status || 'pendiente'}</span>`],
+    ['Estado',  `<span style="color:${statusColor}">${capitalize(sig.status || 'pendiente')}</span>`],
   ];
   const makeRows = rows => rows.map(([label, val], i) => `
     <tr style="${i < rows.length - 1 ? 'border-bottom:1px solid #21262d' : ''}">
@@ -400,7 +400,7 @@ async function loadChannels() {
               <td style="padding:6px 8px;color:#8b949e">${s.pe||'—'}</td>
               <td style="padding:6px 8px;color:#f85149">${s.sl>0?s.sl:'—'}</td>
               <td style="padding:6px 8px;color:#3fb950">${s.tp>0?s.tp:'—'}</td>
-              <td style="padding:6px 8px;color:${sc}">${s.status||'—'}</td>
+              <td style="padding:6px 8px;color:${sc}">${capitalize(s.status||'—')}</td>
               <td style="padding:6px 8px;color:#8b949e;font-size:11px;font-family:monospace">${s.datetime||s.time||'—'}</td>
             </tr>`;
           }).join('');
@@ -615,6 +615,11 @@ async function testParseSection(section) {
     res.textContent = 'Error: ' + e.message
       + (e.message === '403' ? '\n→ Verifica el secret en la URL (?secret=...)' : '');
   }
+}
+
+function capitalize(str) {
+  if (!str || str === '—') return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 function toggleChannelHistory(id) {

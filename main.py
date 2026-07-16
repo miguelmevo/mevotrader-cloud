@@ -92,7 +92,7 @@ signals_executed: int             = 0
 telethon_connected: bool          = False
 bot_running:      bool            = False
 activity_log: deque               = deque(maxlen=100)
-confirm_required: bool            = True   # False = auto-aprobar sin confirmación
+confirm_required: bool            = False  # True = pedir confirmación, False = auto-aprobar
 
 # Canales dinámicos: {id: {"id": int, "name": str, "source": "env"|"dynamic"}}
 extra_channels: dict[int, dict]   = {}
