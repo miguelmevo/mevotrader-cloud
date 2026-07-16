@@ -129,11 +129,14 @@ button.danger:hover{background:#8b3a3a}
   </div>
 
   <div class="card card-full">
-    <div class="card-header">
+    <div class="card-header" onclick="toggleTester()" style="cursor:pointer;user-select:none">
       <h2>Probar mensaje</h2>
-      <span style="font-size:11px;color:#8b949e">Pega una imagen del grupo o escribe el texto del mensaje</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:11px;color:#8b949e">Pega una imagen del grupo o escribe el texto del mensaje</span>
+        <span id="tester-chevron" style="color:#8b949e;font-size:14px;transition:transform .2s">▼</span>
+      </div>
     </div>
-    <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+    <div id="tester-body" class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
 
       <!-- APERTURA -->
       <div class="tester-col">
@@ -538,6 +541,14 @@ async function testParseSection(section) {
     res.textContent = 'Error: ' + e.message
       + (e.message === '403' ? '\n→ Verifica el secret en la URL (?secret=...)' : '');
   }
+}
+
+function toggleTester() {
+  const body = document.getElementById('tester-body');
+  const chevron = document.getElementById('tester-chevron');
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'grid';
+  chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
 }
 
 async function loadLogs() {
