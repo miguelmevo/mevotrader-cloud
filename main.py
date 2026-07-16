@@ -144,11 +144,28 @@ def _save_channel_stats():
     except Exception as e:
         log.warning("No se pudo guardar channel_stats.json: %s", e)
 
+def _rebuild_from_channel_stats():
+    """Reconstruye contadores y signal_history desde channel_stats persistido."""
+    global signals_today, signals_executed, last_signal
+    all_signals = []
+    for stats in channel_stats.values():
+        signals_today += stats.get("total", 0)
+        for sig in stats.get("history", []):
+            all_signals.append(sig)
+            if sig.get("status") in ("aprobada", "auto-aprobada"):
+                signals_executed += 1
+    if all_signals:
+        all_signals.sort(key=lambda s: s.get("datetime", ""), reverse=True)
+        for sig in reversed(all_signals[:20]):
+            signal_history.append(sig)
+        last_signal = all_signals[0]
+
 cfg = load_config()
 extra_channels = _load_extra_channels()
 for entry in _load_activity_log():
     activity_log.append(entry)
 channel_stats.update(_load_channel_stats())
+_rebuild_from_channel_stats()
 _telethon_client: Optional[TelegramClient] = None
 
 def _normalize_id(chat_id: int) -> int:
