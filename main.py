@@ -466,6 +466,15 @@ def _make_handler(client: TelegramClient):
 
 _bot_ref: Optional[Bot] = None
 
+async def _alert(text: str):
+    """Envía alerta al admin vía bot. No lanza excepción si falla."""
+    if not _bot_ref:
+        return
+    try:
+        await _bot_ref.send_message(chat_id=cfg["telegram"]["admin_chat_id"], text=text)
+    except Exception as e:
+        log.warning("No se pudo enviar alerta: %s", e)
+
 async def run_telethon(bot: Bot):
     global telethon_connected, _telethon_client, _bot_ref
     _bot_ref = bot
@@ -484,6 +493,7 @@ async def run_telethon(bot: Bot):
     log.info("Telethon conectado como %s", me.username)
     telethon_connected = True
     _add_log(f"Telethon conectado como @{me.username}")
+    await _alert(f"✅ MevoTrader online — Telethon conectado como @{me.username}")
 
     all_channels = cfg["telegram"]["source_channel"] + list(extra_channels.keys())
     client.add_event_handler(_make_handler(client), events.NewMessage(chats=all_channels))
@@ -492,6 +502,36 @@ async def run_telethon(bot: Bot):
 
     await client.run_until_disconnected()
     telethon_connected = False
+
+async def run_telethon_with_retry(bot: Bot):
+    """Loop de reconexión con backoff exponencial. Alerta al admin en cada evento."""
+    _MIN_DELAY = 5
+    _MAX_DELAY = 300  # 5 minutos
+    delay = _MIN_DELAY
+    first_run = True
+
+    while True:
+        try:
+            if not first_run:
+                log.info("Reconectando Telethon en %ss...", delay)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, _MAX_DELAY)
+
+            await run_telethon(bot)
+
+            # run_telethon retornó = desconexión limpia
+            log.warning("Telethon desconectado (salida limpia)")
+            _add_log("⚠️ Telethon desconectado — reconectando...")
+            await _alert(f"⚠️ MevoTrader: Telethon desconectado.\nReconectando en {delay}s...")
+
+        except Exception as e:
+            log.error("Telethon error: %s", e)
+            _add_log(f"❌ Telethon error: {type(e).__name__}")
+            await _alert(f"❌ MevoTrader: Telethon falló ({type(e).__name__})\nReconectando en {delay}s...")
+
+        finally:
+            telethon_connected = False
+            first_run = False
 
 # -------------------------------------------------------------------
 # Punto de entrada
@@ -510,7 +550,7 @@ async def run_all():
         bot_running = True
         await tg_app.updater.start_polling()
         await asyncio.gather(
-            run_telethon(tg_app.bot),
+            run_telethon_with_retry(tg_app.bot),
             server.serve(),
         )
         await tg_app.updater.stop()
