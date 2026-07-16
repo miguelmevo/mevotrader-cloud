@@ -85,6 +85,7 @@ pending_for_ea:   Optional[dict]  = None
 last_signal:      Optional[dict]  = None
 signal_history:   deque           = deque(maxlen=20)
 signals_today:    int             = 0
+channel_stats:    dict[int, dict] = {}  # {chat_id: {total, buys, sells, history}}
 signals_executed: int             = 0
 telethon_connected: bool          = False
 bot_running:      bool            = False
@@ -113,6 +114,17 @@ def _save_extra_channels():
 cfg = load_config()
 extra_channels = _load_extra_channels()
 _telethon_client: Optional[TelegramClient] = None
+
+def _update_channel_stats(chat_id: int, signal_data: dict):
+    if chat_id not in channel_stats:
+        channel_stats[chat_id] = {"total": 0, "buys": 0, "sells": 0, "history": []}
+    s = channel_stats[chat_id]
+    s["total"] += 1
+    if signal_data.get("direction") == "BUY":
+        s["buys"] += 1
+    elif signal_data.get("direction") == "SELL":
+        s["sells"] += 1
+    s["history"] = ([signal_data] + s["history"])[:20]
 
 def _add_log(msg: str):
     ts = datetime.utcnow().strftime("%H:%M:%S")
@@ -178,9 +190,15 @@ async def api_status(secret: str = Query(...)):
 @app.get("/api/channels")
 async def api_channels(secret: str = Query(...)):
     check_secret(secret)
+    env_names = cfg["telegram"].get("channel_names", {})
     env_channels = cfg["telegram"]["source_channel"]
-    result = [{"id": ch, "name": f"Canal {ch}", "source": "env"} for ch in env_channels]
-    result += list(extra_channels.values())
+    result = [{"id": ch, "name": env_names.get(ch, f"Canal {ch}"), "source": "env",
+               "stats": channel_stats.get(ch, {"total": 0, "buys": 0, "sells": 0, "history": []})}
+              for ch in env_channels]
+    for ch in extra_channels.values():
+        ch_copy = dict(ch)
+        ch_copy["stats"] = channel_stats.get(ch["id"], {"total": 0, "buys": 0, "sells": 0, "history": []})
+        result.append(ch_copy)
     return {"channels": result}
 
 @app.post("/api/channels")
@@ -278,6 +296,7 @@ async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, chan
     last_signal = signal_data
     signal_history.append(signal_data)
     signals_today += 1
+    # Las stats de canal se actualizan desde el handler (tiene el chat_id)
     sl_info = f" SL={signal.sl}" if signal.sl else ""
     tp_info = f" TP={signal.tp}" if signal.tp else ""
     _add_log(f"{'OPEN' if signal.type == SignalType.OPEN else 'CLOSE'} {resolved_symbol} {signal.direction}{sl_info}{tp_info} — esperando aprobación")
@@ -370,6 +389,13 @@ def _make_handler(client: TelegramClient):
         if signal.type == SignalType.OPEN:
             if confirm_required:
                 asyncio.create_task(send_confirmation(_bot_ref, signal, resolved, channel_name))
+                # stats se actualizan dentro de send_confirmation al construir signal_data
+                _update_channel_stats(chat_id, {
+                    "action": "open", "symbol": resolved, "direction": signal.direction,
+                    "pe": signal.price, "sl": signal.sl or 0.0, "tp": signal.tp or 0.0,
+                    "status": "pendiente", "trader": signal.trader, "channel": channel_name,
+                    "datetime": datetime.utcnow().strftime("%d/%m/%Y %H:%M"),
+                })
             else:
                 now = datetime.utcnow()
                 pending_for_ea = {
@@ -390,6 +416,7 @@ def _make_handler(client: TelegramClient):
                 signal_history.append(pending_for_ea)
                 signals_today += 1
                 signals_executed += 1
+                _update_channel_stats(chat_id, pending_for_ea)
                 _add_log(f"AUTO-APROBADA {resolved} {signal.direction}")
                 await _bot_ref.send_message(
                     chat_id=cfg["telegram"]["admin_chat_id"],

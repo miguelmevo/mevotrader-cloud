@@ -357,21 +357,74 @@ async function loadChannels() {
     list.innerHTML = data.channels.map(ch => {
       const active = ch.active !== false;
       const isDynamic = ch.source !== 'env';
+      const stats = ch.stats || {total:0, buys:0, sells:0, history:[]};
       const toggleBtn = isDynamic ? `
-        <button onclick="toggleChannel(${ch.id})" id="toggle-${ch.id}"
+        <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
           style="padding:4px 10px;font-size:12px;border-radius:6px;border:1px solid ${active ? '#238636' : '#6e2e2e'};background:${active ? '#0d2818' : '#2d1117'};color:${active ? '#3fb950' : '#f85149'};cursor:pointer">
           ${active ? '● Activo' : '⏸ Pausado'}
         </button>
-        <button class="danger" style="padding:4px 10px;font-size:12px;margin-left:4px" onclick="removeChannel(${ch.id})">Quitar</button>` :
+        <button class="danger" style="padding:4px 10px;font-size:12px;margin-left:4px" onclick="event.stopPropagation();removeChannel(${ch.id})">Quitar</button>` :
         '<span style="font-size:11px;color:#8b949e">Railway var</span>';
+
+      const historyRows = stats.history.length === 0
+        ? '<tr><td colspan="6" style="padding:10px;text-align:center;color:#8b949e;font-size:12px">Sin señales aún</td></tr>'
+        : stats.history.map(s => {
+            const dir = s.direction || '';
+            const cls = s.action === 'close' ? 'close' : (dir === 'BUY' ? 'buy' : 'sell');
+            const sc = s.status === 'aprobada' || s.status === 'auto-aprobada' ? '#3fb950'
+                     : s.status === 'rechazada' ? '#f85149' : '#d29922';
+            return `<tr style="border-bottom:1px solid #21262d">
+              <td style="padding:6px 8px"><span class="badge ${cls}">${s.action==='close'?'CLOSE':dir}</span></td>
+              <td style="padding:6px 8px;font-weight:600">${s.symbol||'—'}</td>
+              <td style="padding:6px 8px;color:#8b949e">${s.pe||'—'}</td>
+              <td style="padding:6px 8px;color:#f85149">${s.sl>0?s.sl:'—'}</td>
+              <td style="padding:6px 8px;color:#3fb950">${s.tp>0?s.tp:'—'}</td>
+              <td style="padding:6px 8px;color:${sc}">${s.status||'—'}</td>
+              <td style="padding:6px 8px;color:#8b949e;font-size:11px;font-family:monospace">${s.datetime||s.time||'—'}</td>
+            </tr>`;
+          }).join('');
+
       return `
-      <li class="channel-item">
-        <div>
-          <span class="channel-name">${ch.name || 'Sin nombre'}</span>
-          <span class="channel-source">${ch.source === 'env' ? '(variable env)' : ''}</span><br>
-          <span class="channel-id">${ch.id}</span>
+      <li class="channel-item" style="display:block;padding:0;border-bottom:1px solid #21262d">
+        <div onclick="toggleChannelHistory('hist-${ch.id}')"
+             style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer">
+          <div>
+            <span class="channel-name">${ch.name || 'Sin nombre'}</span>
+            <span class="channel-source">${ch.source === 'env' ? '(variable env)' : ''}</span><br>
+            <span class="channel-id">${ch.id}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="display:flex;gap:6px">
+              <span style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:3px 10px;font-size:12px;color:#e6edf3">
+                Señales <strong>${stats.total}</strong>
+              </span>
+              <span style="background:#0d2818;border:1px solid #238636;border-radius:6px;padding:3px 10px;font-size:12px;color:#3fb950">
+                Compras <strong>${stats.buys}</strong>
+              </span>
+              <span style="background:#2d1117;border:1px solid #6e2e2e;border-radius:6px;padding:3px 10px;font-size:12px;color:#f85149">
+                Ventas <strong>${stats.sells}</strong>
+              </span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px" onclick="event.stopPropagation()">${toggleBtn}</div>
+            <span style="color:#8b949e;font-size:12px" id="chev-${ch.id}">▼</span>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:4px">${toggleBtn}</div>
+        <div id="hist-${ch.id}" style="display:none;overflow-x:auto;border-top:1px solid #21262d">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:#0d1117">
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Dir</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Par</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Precio</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">SL</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">TP</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Estado</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>${historyRows}</tbody>
+          </table>
+        </div>
       </li>`;
     }).join('');
     document.getElementById('stat-channels').textContent = data.channels.length;
@@ -541,6 +594,14 @@ async function testParseSection(section) {
     res.textContent = 'Error: ' + e.message
       + (e.message === '403' ? '\n→ Verifica el secret en la URL (?secret=...)' : '');
   }
+}
+
+function toggleChannelHistory(id) {
+  const el = document.getElementById(id);
+  const chev = document.getElementById('chev-' + id.replace('hist-', ''));
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
 }
 
 function toggleTester() {
