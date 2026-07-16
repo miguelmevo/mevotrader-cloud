@@ -31,7 +31,9 @@ log = logging.getLogger("main")
 
 CONFIG_PATH = Path(__file__).parent / "config.json"
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
-CHANNELS_PATH = Path(os.environ.get("DATA_DIR", Path(__file__).parent)) / "channels.json"
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+CHANNELS_PATH = DATA_DIR / "channels.json"
+LOG_PATH      = DATA_DIR / "activity_log.json"
 
 def load_config() -> dict:
     if CONFIG_PATH.exists():
@@ -111,8 +113,25 @@ def _save_extra_channels():
     except Exception as e:
         log.warning("No se pudo guardar channels.json: %s", e)
 
+def _load_activity_log() -> list:
+    if LOG_PATH.exists():
+        try:
+            return json.loads(LOG_PATH.read_text())
+        except Exception:
+            pass
+    return []
+
+def _save_activity_log():
+    try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        LOG_PATH.write_text(json.dumps(list(activity_log)))
+    except Exception as e:
+        log.warning("No se pudo guardar activity_log.json: %s", e)
+
 cfg = load_config()
 extra_channels = _load_extra_channels()
+for entry in _load_activity_log():
+    activity_log.append(entry)
 _telethon_client: Optional[TelegramClient] = None
 
 def _normalize_id(chat_id: int) -> int:
@@ -132,8 +151,9 @@ def _update_channel_stats(chat_id: int, signal_data: dict):
     s["history"] = ([signal_data] + s["history"])[:20]
 
 def _add_log(msg: str):
-    ts = datetime.utcnow().strftime("%H:%M:%S")
+    ts = datetime.utcnow().strftime("%d/%m %H:%M")
     activity_log.append(f"{ts} {msg}")
+    _save_activity_log()
 
 # -------------------------------------------------------------------
 # FastAPI
