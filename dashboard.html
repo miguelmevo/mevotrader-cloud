@@ -262,6 +262,7 @@ async function loadStatus() {
     const lastSig = s.signal_history && s.signal_history.length > 0 ? s.signal_history[0] : s.last_signal;
     renderLastSignalCard(lastSig);
     updateConfirmBtn(s.confirm_required !== false);
+    loadChannels();
 
     const btn = document.getElementById('btn-pause');
     if (s.signals_paused) {
