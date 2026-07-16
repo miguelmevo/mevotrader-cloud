@@ -59,7 +59,7 @@ def load_config() -> dict:
         "telegram": {
             "api_id":         os.environ["TG_API_ID"],
             "api_hash":       os.environ["TG_API_HASH"],
-            "source_channel": [int(x.strip()) for x in os.environ["TG_SOURCE_CHANNEL"].split(",")],
+            "source_channel": [int(x.strip()) for x in os.environ.get("TG_SOURCE_CHANNEL", "").split(",") if x.strip()],
             "bot_token":      os.environ["TG_BOT_TOKEN"],
             "admin_chat_id":  os.environ["TG_ADMIN_CHAT_ID"],
             "channel_names":  channel_names,
