@@ -391,7 +391,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------------------------------------------------------------------
 def _make_handler(client: TelegramClient):
     async def on_message(event):
-        global pending_for_ea
+        global pending_for_ea, last_signal, signals_today, signals_executed
         chat_id = event.chat_id
         if chat_id in extra_channels and not extra_channels[chat_id].get("active", True):
             return
