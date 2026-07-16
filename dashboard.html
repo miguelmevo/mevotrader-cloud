@@ -392,6 +392,23 @@ async function loadChannels() {
               <td style="padding:6px 8px;color:#3fb950">${s.tp>0?s.tp:'—'}</td>
               <td style="padding:6px 8px;color:${sc}">${capitalize(s.status||'—')}</td>
               <td style="padding:6px 8px;color:#8b949e;font-size:11px;font-family:monospace">${s.datetime||s.time||'—'}</td>
+              <td style="padding:4px 8px">
+                <select onchange="saveAnnotation('${s.id}','result',this.value)"
+                  style="background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;font-size:11px;padding:2px 4px;cursor:pointer">
+                  <option value="" ${!s.result?'selected':''}>—</option>
+                  <option value="TP1" ${s.result==='TP1'?'selected':''}>TP1</option>
+                  <option value="TP2" ${s.result==='TP2'?'selected':''}>TP2</option>
+                  <option value="TP3" ${s.result==='TP3'?'selected':''}>TP3</option>
+                  <option value="BE"  ${s.result==='BE'?'selected':''}>BE</option>
+                  <option value="SL"  ${s.result==='SL'?'selected':''}>SL</option>
+                  <option value="NO SE EJECUTÓ" ${s.result==='NO SE EJECUTÓ'?'selected':''}>No ejecutó</option>
+                </select>
+              </td>
+              <td style="padding:4px 8px">
+                <input type="text" value="${s.note||''}" placeholder="nota..."
+                  onchange="saveAnnotation('${s.id}','note',this.value)"
+                  style="background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#e6edf3;font-size:11px;padding:2px 6px;width:110px">
+              </td>
             </tr>`;
           }).join('');
 
@@ -431,6 +448,8 @@ async function loadChannels() {
                 <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">TP</th>
                 <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Estado</th>
                 <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Fecha</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Resultado</th>
+                <th style="padding:6px 8px;color:#8b949e;text-align:left;font-weight:500">Nota</th>
               </tr>
             </thead>
             <tbody>${historyRows}</tbody>
@@ -604,6 +623,18 @@ async function testParseSection(section) {
     res.className = 'parse-result err';
     res.textContent = 'Error: ' + e.message
       + (e.message === '403' ? '\n→ Verifica el secret en la URL (?secret=...)' : '');
+  }
+}
+
+async function saveAnnotation(signalId, field, value) {
+  try {
+    await api(`/api/signal/${signalId}/annotation`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({[field]: value})
+    });
+  } catch(e) {
+    console.error('Error guardando anotación:', e);
   }
 }
 

@@ -34,6 +34,7 @@ DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
 CHANNELS_PATH = DATA_DIR / "channels.json"
 LOG_PATH      = DATA_DIR / "activity_log.json"
+STATS_PATH    = DATA_DIR / "channel_stats.json"
 
 def load_config() -> dict:
     if CONFIG_PATH.exists():
@@ -128,10 +129,26 @@ def _save_activity_log():
     except Exception as e:
         log.warning("No se pudo guardar activity_log.json: %s", e)
 
+def _load_channel_stats() -> dict:
+    if STATS_PATH.exists():
+        try:
+            return {int(k): v for k, v in json.loads(STATS_PATH.read_text()).items()}
+        except Exception:
+            pass
+    return {}
+
+def _save_channel_stats():
+    try:
+        STATS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        STATS_PATH.write_text(json.dumps(channel_stats))
+    except Exception as e:
+        log.warning("No se pudo guardar channel_stats.json: %s", e)
+
 cfg = load_config()
 extra_channels = _load_extra_channels()
 for entry in _load_activity_log():
     activity_log.append(entry)
+channel_stats.update(_load_channel_stats())
 _telethon_client: Optional[TelegramClient] = None
 
 def _normalize_id(chat_id: int) -> int:
@@ -149,6 +166,7 @@ def _update_channel_stats(chat_id: int, signal_data: dict):
     elif signal_data.get("direction") == "SELL":
         s["sells"] += 1
     s["history"] = ([signal_data] + s["history"])[:20]
+    _save_channel_stats()
 
 def _add_log(msg: str):
     ts = datetime.utcnow().strftime("%d/%m %H:%M")
@@ -278,6 +296,31 @@ async def api_toggle_channel(channel_id: int, secret: str = Query(...)):
 async def api_logs(secret: str = Query(...)):
     check_secret(secret)
     return {"logs": list(activity_log)}
+
+@app.patch("/api/signal/{signal_id}/annotation")
+async def api_annotate_signal(signal_id: str, body: dict, secret: str = Query(...)):
+    check_secret(secret)
+    found = False
+    for stats in channel_stats.values():
+        for sig in stats.get("history", []):
+            if sig.get("id") == signal_id:
+                if "result" in body:
+                    sig["result"] = body["result"]
+                if "note" in body:
+                    sig["note"] = body["note"]
+                found = True
+                break
+        if found:
+            break
+    for sig in signal_history:
+        if sig.get("id") == signal_id:
+            if "result" in body:
+                sig["result"] = body["result"]
+            if "note" in body:
+                sig["note"] = body["note"]
+            break
+    _save_channel_stats()
+    return {"ok": found}
 
 @app.post("/debug/parse")
 async def debug_parse(body: dict, secret: str = Query(...)):
