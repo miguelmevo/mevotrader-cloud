@@ -300,7 +300,7 @@ async def debug_parse(body: dict, secret: str = Query(...)):
 # -------------------------------------------------------------------
 # Confirmación via Telegram bot
 # -------------------------------------------------------------------
-async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, channel_name: str = "—"):
+async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, channel_name: str = "—", channel_id: int = 0):
     global last_signal, signals_today
     callback_id = str(uuid.uuid4())[:8]
 
@@ -323,7 +323,9 @@ async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, chan
     last_signal = signal_data
     signal_history.append(signal_data)
     signals_today += 1
-    # Las stats de canal se actualizan desde el handler (tiene el chat_id)
+    # Pasar el MISMO dict a channel_stats para que al mutar el estado se refleje aquí
+    if channel_id:
+        _update_channel_stats(channel_id, signal_data)
     sl_info = f" SL={signal.sl}" if signal.sl else ""
     tp_info = f" TP={signal.tp}" if signal.tp else ""
     _add_log(f"{'OPEN' if signal.type == SignalType.OPEN else 'CLOSE'} {resolved_symbol} {signal.direction}{sl_info}{tp_info} — esperando aprobación")
@@ -418,14 +420,7 @@ def _make_handler(client: TelegramClient):
 
         if signal.type == SignalType.OPEN:
             if confirm_required:
-                asyncio.create_task(send_confirmation(_bot_ref, signal, resolved, channel_name))
-                # stats se actualizan dentro de send_confirmation al construir signal_data
-                _update_channel_stats(chat_id, {
-                    "action": "open", "symbol": resolved, "direction": signal.direction,
-                    "pe": signal.price, "sl": signal.sl or 0.0, "tp": signal.tp or 0.0,
-                    "status": "pendiente", "trader": signal.trader, "channel": channel_name,
-                    "datetime": datetime.utcnow().strftime("%d/%m/%Y %H:%M"),
-                })
+                asyncio.create_task(send_confirmation(_bot_ref, signal, resolved, channel_name, chat_id))
             else:
                 now = datetime.utcnow()
                 pending_for_ea = {
