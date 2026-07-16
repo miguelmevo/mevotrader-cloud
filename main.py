@@ -115,10 +115,15 @@ cfg = load_config()
 extra_channels = _load_extra_channels()
 _telethon_client: Optional[TelegramClient] = None
 
+def _normalize_id(chat_id: int) -> int:
+    """Normaliza el ID del canal: siempre positivo para comparar."""
+    return abs(chat_id)
+
 def _update_channel_stats(chat_id: int, signal_data: dict):
-    if chat_id not in channel_stats:
-        channel_stats[chat_id] = {"total": 0, "buys": 0, "sells": 0, "history": []}
-    s = channel_stats[chat_id]
+    key = _normalize_id(chat_id)
+    if key not in channel_stats:
+        channel_stats[key] = {"total": 0, "buys": 0, "sells": 0, "history": []}
+    s = channel_stats[key]
     s["total"] += 1
     if signal_data.get("direction") == "BUY":
         s["buys"] += 1
@@ -190,14 +195,16 @@ async def api_status(secret: str = Query(...)):
 @app.get("/api/channels")
 async def api_channels(secret: str = Query(...)):
     check_secret(secret)
+    empty_stats = lambda: {"total": 0, "buys": 0, "sells": 0, "history": []}
     env_names = cfg["telegram"].get("channel_names", {})
     env_channels = cfg["telegram"]["source_channel"]
-    result = [{"id": ch, "name": env_names.get(ch, f"Canal {ch}"), "source": "env",
-               "stats": channel_stats.get(ch, {"total": 0, "buys": 0, "sells": 0, "history": []})}
+    result = [{"id": ch, "name": env_names.get(ch, env_names.get(abs(ch), f"Canal {abs(ch)}")),
+               "source": "env",
+               "stats": channel_stats.get(abs(ch), empty_stats())}
               for ch in env_channels]
     for ch in extra_channels.values():
         ch_copy = dict(ch)
-        ch_copy["stats"] = channel_stats.get(ch["id"], {"total": 0, "buys": 0, "sells": 0, "history": []})
+        ch_copy["stats"] = channel_stats.get(abs(ch["id"]), empty_stats())
         result.append(ch_copy)
     return {"channels": result}
 
@@ -377,12 +384,15 @@ def _make_handler(client: TelegramClient):
         base     = signal.symbol_raw.split(".")[0]
         resolved = base + symbol_suffix
 
-        # Nombre del canal origen
+        # Nombre del canal origen (normalizar ID: Telethon puede dar negativo)
+        norm_id = _normalize_id(chat_id)
         if chat_id in extra_channels:
-            channel_name = extra_channels[chat_id].get("name", str(chat_id))
+            channel_name = extra_channels[chat_id].get("name", str(norm_id))
+        elif norm_id in extra_channels:
+            channel_name = extra_channels[norm_id].get("name", str(norm_id))
         else:
             env_names = cfg["telegram"].get("channel_names", {})
-            channel_name = env_names.get(chat_id, str(chat_id))
+            channel_name = env_names.get(chat_id, env_names.get(norm_id, str(norm_id)))
 
         log.info("Señal: %s %s %s canal=%s", signal.type.value, resolved, signal.direction, channel_name)
 
