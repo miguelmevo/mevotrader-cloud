@@ -315,23 +315,32 @@ function renderLastSignalCard(sig) {
   const cls = sig.action === 'close' ? 'close' : (dir === 'BUY' ? 'buy' : 'sell');
   const statusColor = sig.status === 'aprobada' || sig.status === 'auto-aprobada' ? '#3fb950'
                     : sig.status === 'rechazada' ? '#f85149' : '#d29922';
-  const rows = [
-    ['Símbolo',   `<span style="font-weight:600;color:#e6edf3">${sig.symbol || '—'}</span> &nbsp;<span class="badge ${cls}">${sig.action === 'close' ? 'CLOSE' : dir}</span>`],
-    ['Precio',    sig.pe || '—'],
-    ['SL',        sig.sl && sig.sl > 0 ? `<span style="color:#f85149">${sig.sl}</span>` : '—'],
-    ['TP',        sig.tp && sig.tp > 0 ? `<span style="color:#3fb950">${sig.tp}</span>` : '—'],
-    ['Origen',    `<span style="color:#58a6ff">${sig.channel || sig.trader || '—'}</span>`],
-    ['Trader',    sig.trader || '—'],
-    ['Fecha',     sig.datetime || sig.time || '—'],
-    ['Estado',    `<span style="color:${statusColor}">${sig.status || 'pendiente'}</span>`],
+  const col1 = [
+    ['Símbolo', `<span style="font-weight:600;color:#e6edf3">${sig.symbol || '—'}</span> &nbsp;<span class="badge ${cls}">${sig.action === 'close' ? 'CLOSE' : dir}</span>`],
+    ['Precio',  sig.pe || '—'],
+    ['SL',      sig.sl && sig.sl > 0 ? `<span style="color:#f85149">${sig.sl}</span>` : '—'],
+    ['TP',      sig.tp && sig.tp > 0 ? `<span style="color:#3fb950">${sig.tp}</span>` : '—'],
   ];
-  el.innerHTML = `<table style="width:100%;border-collapse:collapse">` +
-    rows.map(([label, val]) => `
-      <tr style="border-bottom:1px solid #21262d">
-        <td style="padding:8px 4px;color:#8b949e;font-size:12px;width:72px;white-space:nowrap">${label}</td>
-        <td style="padding:8px 4px;font-size:13px">${val}</td>
-      </tr>`).join('') +
-    `</table>`;
+  const col2 = [
+    ['Origen',  `<span style="color:#58a6ff">${sig.channel || sig.trader || '—'}</span>`],
+    ['Trader',  sig.trader || '—'],
+    ['Fecha',   sig.datetime || sig.time || '—'],
+    ['Estado',  `<span style="color:${statusColor}">${sig.status || 'pendiente'}</span>`],
+  ];
+  const makeRows = rows => rows.map(([label, val], i) => `
+    <tr style="${i < rows.length - 1 ? 'border-bottom:1px solid #21262d' : ''}">
+      <td style="padding:8px 4px;color:#8b949e;font-size:12px;white-space:nowrap">${label}</td>
+      <td style="padding:8px 4px;font-size:13px">${val}</td>
+    </tr>`).join('');
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      <table style="width:100%;border-collapse:collapse;border-right:1px solid #30363d">
+        ${makeRows(col1)}
+      </table>
+      <table style="width:100%;border-collapse:collapse;padding-left:0">
+        ${makeRows(col2)}
+      </table>
+    </div>`;
 }
 
 async function loadChannels() {
