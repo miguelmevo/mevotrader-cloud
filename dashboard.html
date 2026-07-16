@@ -36,8 +36,6 @@ button.danger{background:#6e2e2e;border-color:#8b3a3a;color:#f85149}
 button.danger:hover{background:#8b3a3a}
 .row{display:flex;gap:8px;align-items:center}
 .channel-list{list-style:none}
-.channel-item{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #21262d}
-.channel-item:last-child{border-bottom:none}
 .channel-id{font-family:'SF Mono',Consolas,monospace;font-size:12px;color:#58a6ff}
 .channel-name{font-size:13px;color:#e6edf3}
 .channel-source{font-size:11px;color:#8b949e;margin-left:6px}
@@ -49,7 +47,7 @@ button.danger:hover{background:#8b3a3a}
 .log-feed .signal-buy{color:#58a6ff}
 .log-feed .signal-sell{color:#f85149}
 .log-feed .info{color:#8b949e}
-.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:0}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .stat{background:#0d1117;border-radius:8px;padding:12px 14px}
 .stat-label{font-size:11px;color:#8b949e;margin-bottom:4px}
 .stat-value{font-size:22px;font-weight:600;color:#e6edf3}
@@ -66,7 +64,29 @@ button.danger:hover{background:#8b3a3a}
 .img-drop-inner{text-align:center;font-size:13px;color:#8b949e;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px}
 .img-drop.has-img .img-drop-inner{display:none}
 .img-drop.has-img img{display:block!important}
-@media(max-width:700px){.card-body[style*="grid"]{grid-template-columns:1fr!important}}
+.ch-stats{display:flex;gap:6px;flex-wrap:wrap}
+.ch-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+
+/* ── Responsivo ── */
+@media(max-width:768px){
+  .topbar{padding:0 14px;height:auto;min-height:52px;flex-wrap:wrap;gap:8px;padding-top:10px;padding-bottom:10px}
+  .status-chips{flex-wrap:wrap;gap:6px}
+  .chip{font-size:11px;padding:2px 8px}
+  #btn-confirm{font-size:11px!important;padding:2px 10px!important}
+  .container{grid-template-columns:1fr;padding:12px;gap:14px}
+  .card-full{grid-column:1}
+  .stat-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat-value{font-size:20px}
+  #last-signal-card > div{grid-template-columns:1fr!important}
+  #last-signal-card > div > table:first-child{border-right:none!important;border-bottom:1px solid #30363d}
+  #add-form{flex-wrap:wrap}
+  #add-form input{min-width:0}
+  .ch-stats{gap:4px}
+  .ch-stats span{font-size:11px!important;padding:2px 7px!important}
+  .ch-actions button{font-size:11px!important;padding:3px 8px!important}
+  .tester-col textarea{min-height:80px}
+  #tester-body{grid-template-columns:1fr!important}
+}
 </style>
 </head>
 <body>
@@ -394,7 +414,7 @@ async function loadChannels() {
             <span class="channel-id">${ch.id}</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <div style="display:flex;gap:6px">
+            <div class="ch-stats">
               <span style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:3px 10px;font-size:12px;color:#e6edf3">
                 Señales <strong>${stats.total}</strong>
               </span>
@@ -405,7 +425,7 @@ async function loadChannels() {
                 Ventas <strong>${stats.sells}</strong>
               </span>
             </div>
-            <div style="display:flex;align-items:center;gap:4px" onclick="event.stopPropagation()">${toggleBtn}</div>
+            <div class="ch-actions" onclick="event.stopPropagation()">${toggleBtn}</div>
             <span style="color:#8b949e;font-size:12px" id="chev-${ch.id}">▼</span>
           </div>
         </div>
