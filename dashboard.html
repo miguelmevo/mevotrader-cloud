@@ -66,13 +66,7 @@ button.danger:hover{background:#8b3a3a}
 .img-drop.has-img img{display:block!important}
 .ch-stats{display:flex;gap:6px;flex-wrap:wrap}
 .ch-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.rs{position:relative;display:inline-block}
-.rs-btn{background:#0d1117;border:1px solid #30363d;border-radius:4px;font-size:11px;padding:2px 18px 2px 7px;cursor:pointer;min-width:82px;text-align:left;position:relative;font-family:inherit}
-.rs-btn::after{content:'▾';position:absolute;right:5px;top:50%;transform:translateY(-50%);color:#8b949e;font-size:9px;pointer-events:none}
-.rs-menu{position:absolute;top:calc(100% + 2px);left:0;z-index:200;background:#161b22;border:1px solid #30363d;border-radius:6px;min-width:110px;box-shadow:0 4px 16px rgba(0,0,0,.6);display:none}
-.rs.open .rs-menu{display:block}
-.rs-opt{padding:5px 10px;font-size:11px;cursor:pointer;white-space:nowrap}
-.rs-opt:hover{background:#21262d}
+.result-sel{background:#0d1117;border:1px solid #30363d;border-radius:4px;font-size:11px;padding:2px 4px;cursor:pointer;font-family:inherit;min-width:88px}
 
 /* ── Responsivo ── */
 @media(max-width:768px){
@@ -399,7 +393,18 @@ async function loadChannels() {
               <td style="padding:6px 8px;color:#3fb950">${s.tp>0?s.tp:'—'}</td>
               <td style="padding:6px 8px;color:${sc}">${capitalize(s.status||'—')}</td>
               <td style="padding:6px 8px;color:#8b949e;font-size:11px;font-family:monospace">${s.datetime||s.time||'—'}</td>
-              <td style="padding:4px 8px">${makeResultSelect(s.id, s.result||'')}</td>
+              <td style="padding:4px 8px">
+                <select class="result-sel" style="color:${rsColor(s.result||'')}"
+                  onchange="changeResult('${s.id}',this)">
+                  <option value=""              ${!s.result?'selected':''}>—</option>
+                  <option value="SL"            ${s.result==='SL'?'selected':''}>SL</option>
+                  <option value="BE"            ${s.result==='BE'?'selected':''}>BE</option>
+                  <option value="TP1"           ${s.result==='TP1'?'selected':''}>TP1</option>
+                  <option value="TP2"           ${s.result==='TP2'?'selected':''}>TP2</option>
+                  <option value="TP3"           ${s.result==='TP3'?'selected':''}>TP3</option>
+                  <option value="NO SE EJECUTÓ" ${s.result==='NO SE EJECUTÓ'?'selected':''}>No ejecutó</option>
+                </select>
+              </td>
               <td style="padding:4px 8px">
                 <input type="text" value="${s.note||''}" placeholder="nota..."
                   onchange="saveAnnotation('${s.id}','note',this.value)"
@@ -622,55 +627,14 @@ async function testParseSection(section) {
   }
 }
 
-const RS_OPTIONS = [
-  {value: '',              label: '—',           color: '#8b949e'},
-  {value: 'SL',           label: 'SL',           color: '#f85149'},
-  {value: 'BE',           label: 'BE',           color: '#8b949e'},
-  {value: 'TP1',          label: 'TP1',          color: '#3fb950'},
-  {value: 'TP2',          label: 'TP2',          color: '#3fb950'},
-  {value: 'TP3',          label: 'TP3',          color: '#3fb950'},
-  {value: 'NO SE EJECUTÓ',label: 'No ejecutó',   color: '#d29922'},
-];
+const RESULT_COLORS = {'SL':'#f85149','BE':'#8b949e','TP1':'#3fb950','TP2':'#3fb950','TP3':'#3fb950','NO SE EJECUTÓ':'#d29922'};
 
-function rsColor(v) {
-  return (RS_OPTIONS.find(o => o.value === v) || RS_OPTIONS[0]).color;
-}
-function rsLabel(v) {
-  return (RS_OPTIONS.find(o => o.value === v) || RS_OPTIONS[0]).label;
-}
+function rsColor(v) { return RESULT_COLORS[v] || '#8b949e'; }
 
-function makeResultSelect(signalId, current) {
-  const color = rsColor(current);
-  const label = rsLabel(current);
-  const opts = RS_OPTIONS.map(o =>
-    `<div class="rs-opt" style="color:${o.color}" onclick="pickResult('${signalId}','${o.value}',this)">${o.label}</div>`
-  ).join('');
-  return `<div class="rs" id="rs-${signalId}">
-    <button class="rs-btn" style="color:${color}" onclick="toggleRS('rs-${signalId}',event)">${label}</button>
-    <div class="rs-menu">${opts}</div>
-  </div>`;
+function changeResult(signalId, sel) {
+  sel.style.color = rsColor(sel.value);
+  saveAnnotation(signalId, 'result', sel.value);
 }
-
-function toggleRS(id, e) {
-  e.stopPropagation();
-  const el = document.getElementById(id);
-  const wasOpen = el.classList.contains('open');
-  document.querySelectorAll('.rs.open').forEach(x => x.classList.remove('open'));
-  if (!wasOpen) el.classList.add('open');
-}
-
-async function pickResult(signalId, value, optEl) {
-  const container = optEl.closest('.rs');
-  const btn = container.querySelector('.rs-btn');
-  btn.textContent = rsLabel(value);
-  btn.style.color = rsColor(value);
-  container.classList.remove('open');
-  await saveAnnotation(signalId, 'result', value);
-}
-
-document.addEventListener('click', () => {
-  document.querySelectorAll('.rs.open').forEach(x => x.classList.remove('open'));
-});
 
 async function saveAnnotation(signalId, field, value) {
   try {
