@@ -264,16 +264,6 @@ async function loadStatus() {
     updateConfirmBtn(s.confirm_required !== false);
     loadChannels();
 
-    const btn = document.getElementById('btn-pause');
-    if (s.signals_paused) {
-      btn.textContent = '▶ Reactivar';
-      btn.style.borderColor = '#d29922';
-      btn.style.color = '#d29922';
-    } else {
-      btn.textContent = '⏸ Pausar';
-      btn.style.borderColor = '#30363d';
-      btn.style.color = '#e6edf3';
-    }
   } catch(e) {
     document.getElementById('chip-telethon').className = 'chip err';
     document.getElementById('chip-telethon').textContent = 'Sin conexión';
