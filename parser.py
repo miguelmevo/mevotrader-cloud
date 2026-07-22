@@ -47,8 +47,18 @@ def parse_message(text: str) -> Optional[Signal]:
     if m:
         return _parse_trade_signal(text, m)
 
+    # --- Formato SYMBOL BUY/SELL NOW  (ej: "US30 BUY NOW") ---
+    m = re.search(r'\b([\w./]{2,10})\s+(BUY|SELL)\s+NOW\b', text, re.IGNORECASE)
+    if m:
+        return _parse_now_signal(text, m)
+
+    # --- Formato DIRECTION SYMBOL PRICE  (ej: "SELL XAUUSD 4138\nSL 4160\nTP NINGUNO") ---
+    m = re.search(r'^(BUY|SELL)\s+([\w./]{2,10})\s+([\d.]{2,12})\s*$',
+                  text, re.IGNORECASE | re.MULTILINE)
+    if m:
+        return _parse_dir_symbol_price(text, m)
+
     # --- Formato genérico: BUY/SELL SYMBOL (sin TRADE) ---
-    # Ej: "BUY XAUUSD" o "SELL EURUSD" con ENTRY/SL/TP
     m = re.search(r'^(BUY|SELL)\s+([\w.]+)', text, re.IGNORECASE | re.MULTILINE)
     if m and re.search(r'ENTRY\s*[:\s]', text, re.IGNORECASE):
         return _parse_trade_signal(text, m)
@@ -186,6 +196,53 @@ def _parse_at_signal(text: str, m) -> Optional[Signal]:
         tp=tp,
         format="at_signal",
         raw_text=text,
+    )
+
+
+# ──────────────────────────────────────────
+# Formato SYMBOL BUY/SELL NOW  (ImperiumFX, etc.)
+# ──────────────────────────────────────────
+
+def _parse_now_signal(text: str, m) -> Optional[Signal]:
+    symbol    = normalize_symbol(m.group(1))
+    direction = m.group(2).upper()
+    sl = _find_price(text, r'SL\s*[:\s]\s*([\d.]+)')
+    tp_m = re.search(r'TP\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
+    tp = float(tp_m.group(1)) if tp_m else None
+    return Signal(
+        type=SignalType.OPEN, trader=_guess_trader(text),
+        symbol_raw=symbol, direction=direction,
+        lots=0.0, price=0.0,
+        sl=sl, tp=tp,
+        format="now_signal", raw_text=text,
+    )
+
+
+# ──────────────────────────────────────────
+# Formato DIRECTION SYMBOL PRICE  (PapaEnParis, etc.)
+# ──────────────────────────────────────────
+
+def _parse_dir_symbol_price(text: str, m) -> Optional[Signal]:
+    direction = m.group(1).upper()
+    symbol    = normalize_symbol(m.group(2))
+    price     = float(m.group(3))
+    sl = _find_price(text, r'(?:^|\n)\s*S/?L\s*[:\s]\s*([\d.]+)')
+    tp_m = re.search(r'(?:^|\n)\s*T/?P\s*[:\s]\s*([\d.]+|NINGUNO|NONE|-)',
+                     text, re.IGNORECASE)
+    tp = None
+    if tp_m:
+        raw = tp_m.group(1).upper()
+        if raw not in ('NINGUNO', 'NONE', '-'):
+            try:
+                tp = float(raw)
+            except ValueError:
+                pass
+    return Signal(
+        type=SignalType.OPEN, trader=_guess_trader(text),
+        symbol_raw=symbol, direction=direction,
+        lots=0.0, price=price,
+        sl=sl, tp=tp,
+        format="dir_symbol_price", raw_text=text,
     )
 
 

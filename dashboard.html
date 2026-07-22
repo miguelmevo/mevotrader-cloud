@@ -59,11 +59,6 @@ button.danger:hover{background:#8b3a3a}
 .badge.sell{background:#2d1117;color:#f85149;border:1px solid #6e2e2e}
 .badge.close{background:#1c1f2b;color:#8b949e;border:1px solid #30363d}
 #add-form{display:none;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid #30363d}
-.img-drop{border:2px dashed #30363d;border-radius:8px;min-height:120px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;transition:border-color .2s,background .2s;overflow:hidden}
-.img-drop:hover,.img-drop.over{border-color:#58a6ff;background:#0d1f33}
-.img-drop-inner{text-align:center;font-size:13px;color:#8b949e;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px}
-.img-drop.has-img .img-drop-inner{display:none}
-.img-drop.has-img img{display:block!important}
 .ch-stats{display:flex;gap:6px;flex-wrap:wrap}
 .ch-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .result-sel{background:#0d1117;border:1px solid #30363d;border-radius:4px;font-size:11px;padding:2px 4px;cursor:pointer;font-family:inherit;min-width:88px}
@@ -153,69 +148,30 @@ button.danger:hover{background:#8b3a3a}
     <div class="card-header" onclick="toggleTester()" style="cursor:pointer;user-select:none">
       <h2>Probar mensaje</h2>
       <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:11px;color:#8b949e">Pega una imagen del grupo o escribe el texto del mensaje</span>
+        <span style="font-size:11px;color:#8b949e">Pega el texto del mensaje del canal</span>
         <span id="tester-chevron" style="color:#8b949e;font-size:14px;transition:transform .2s;transform:rotate(-90deg)">▼</span>
       </div>
     </div>
-    <div id="tester-body" class="card-body" style="display:none;grid-template-columns:1fr 1fr;gap:20px">
+    <div id="tester-body" class="card-body" style="display:none">
+      <textarea id="msg-test" placeholder="Pega aquí el texto exacto del mensaje del canal. Ejemplos:
 
-      <!-- APERTURA -->
-      <div class="tester-col">
-        <div style="font-size:12px;font-weight:600;color:#3fb950;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-          <span style="width:8px;height:8px;border-radius:50%;background:#3fb950;display:inline-block"></span>
-          SEÑAL DE APERTURA
-        </div>
-        <div class="img-drop" id="drop-open" onclick="document.getElementById('file-open').click()" ondrop="handleDrop(event,'open')" ondragover="event.preventDefault()" onpaste="handlePasteZone(event,'open')">
-          <div class="img-drop-inner" id="drop-open-inner">
-            <div style="font-size:22px">📷</div>
-            <div>Haz clic, pega (Ctrl+V) o arrastra</div>
-            <div style="font-size:11px;color:#8b949e">una captura del grupo</div>
-          </div>
-          <img id="preview-open" style="display:none;max-width:100%;max-height:180px;border-radius:4px;object-fit:contain">
-        </div>
-        <input type="file" id="file-open" accept="image/*" style="display:none" onchange="handleFile(event,'open')">
-        <textarea id="msg-open" placeholder="O pega aquí el texto del mensaje de apertura...
-Ej:
+US30 BUY NOW
+
+SELL XAUUSD 4138
+SL 4160
+TP NINGUNO
+
+BUY TRADE XAUUSD
+ENTRY: 3320 | SL: 3300 | TP: 3360
+
 Trader acaba de abrir una posición
 XAUUSD — BUY 0.10 lots
-Precio: 3320.50" style="margin-top:10px;min-height:100px"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="primary" onclick="testParseSection('open')" style="flex:1">▶ Probar apertura</button>
-          <button onclick="clearSection('open')" title="Limpiar">✕ Limpiar</button>
-        </div>
-        <div class="parse-result" id="result-open"></div>
+Precio: 3320.50" style="min-height:130px;width:100%"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="primary" onclick="testParse()" style="flex:1">▶ Probar</button>
+        <button onclick="document.getElementById('msg-test').value='';document.getElementById('result-test').style.display='none'">✕ Limpiar</button>
       </div>
-
-      <!-- CIERRE -->
-      <div class="tester-col">
-        <div style="font-size:12px;font-weight:600;color:#f85149;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-          <span style="width:8px;height:8px;border-radius:50%;background:#f85149;display:inline-block"></span>
-          SEÑAL DE CIERRE
-        </div>
-        <div class="img-drop" id="drop-close" onclick="document.getElementById('file-close').click()" ondrop="handleDrop(event,'close')" ondragover="event.preventDefault()" onpaste="handlePasteZone(event,'close')">
-          <div class="img-drop-inner" id="drop-close-inner">
-            <div style="font-size:22px">📷</div>
-            <div>Haz clic, pega (Ctrl+V) o arrastra</div>
-            <div style="font-size:11px;color:#8b949e">una captura del grupo</div>
-          </div>
-          <img id="preview-close" style="display:none;max-width:100%;max-height:180px;border-radius:4px;object-fit:contain">
-        </div>
-        <input type="file" id="file-close" accept="image/*" style="display:none" onchange="handleFile(event,'close')">
-        <textarea id="msg-close" placeholder="O pega aquí el texto del mensaje de cierre...
-Ej:
-Trader acaba de cerrar una posición
-XAUUSD — BUY 0.10 lots
-Precio de apertura: 3310.00
-Precio de cierre: 3320.50
-Variación: +10.5 pips
-Beneficio: +$105.00" style="margin-top:10px;min-height:100px"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button class="primary" onclick="testParseSection('close')" style="flex:1">▶ Probar cierre</button>
-          <button onclick="clearSection('close')" title="Limpiar">✕ Limpiar</button>
-        </div>
-        <div class="parse-result" id="result-close"></div>
-      </div>
-
+      <div class="parse-result" id="result-test"></div>
     </div>
   </div>
 
@@ -493,99 +449,13 @@ async function removeChannel(id) {
   } catch(e) { alert('Error: ' + e.message); }
 }
 
-function setImage(section, src) {
-  const drop = document.getElementById('drop-' + section);
-  const img  = document.getElementById('preview-' + section);
-  img.src = src;
-  drop.classList.add('has-img');
-}
-
-function handleFile(evt, section) {
-  const file = evt.target.files[0];
-  if (!file || !file.type.startsWith('image/')) return;
-  const reader = new FileReader();
-  reader.onload = e => setImage(section, e.target.result);
-  reader.readAsDataURL(file);
-}
-
-function handleDrop(evt, section) {
-  evt.preventDefault();
-  const drop = document.getElementById('drop-' + section);
-  drop.classList.remove('over');
-  const file = evt.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) {
-    const reader = new FileReader();
-    reader.onload = e => setImage(section, e.target.result);
-    reader.readAsDataURL(file);
-  }
-}
-
-function handlePasteZone(evt, section) {
-  const items = (evt.clipboardData || evt.originalEvent?.clipboardData)?.items;
-  if (!items) return;
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      evt.preventDefault();
-      const blob = item.getAsFile();
-      const reader = new FileReader();
-      reader.onload = e => setImage(section, e.target.result);
-      reader.readAsDataURL(blob);
-      return;
-    }
-  }
-}
-
-// Global paste: detect which section is active or apply to both
-document.addEventListener('paste', function(evt) {
-  const items = (evt.clipboardData || evt.originalEvent?.clipboardData)?.items;
-  if (!items) return;
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      // Find the section whose drop zone or textarea last had focus
-      const active = document.activeElement;
-      let section = null;
-      if (active && active.id) {
-        if (active.id.includes('open'))  section = 'open';
-        if (active.id.includes('close')) section = 'close';
-      }
-      if (!section) section = 'open'; // default
-      const blob = item.getAsFile();
-      const reader = new FileReader();
-      reader.onload = e => setImage(section, e.target.result);
-      reader.readAsDataURL(blob);
-      return;
-    }
-  }
-});
-
-// Drag over highlight
-['open','close'].forEach(s => {
-  const el = document.getElementById('drop-' + s);
-  if (el) {
-    el.addEventListener('dragenter', () => el.classList.add('over'));
-    el.addEventListener('dragleave', () => el.classList.remove('over'));
-  }
-});
-
-function clearSection(section) {
-  document.getElementById('msg-' + section).value = '';
-  document.getElementById('result-' + section).style.display = 'none';
-  document.getElementById('result-' + section).className = 'parse-result';
-  const drop = document.getElementById('drop-' + section);
-  drop.classList.remove('has-img');
-  const img = document.getElementById('preview-' + section);
-  img.src = '';
-  const fileInput = document.getElementById('file-' + section);
-  if (fileInput) fileInput.value = '';
-}
-
-async function testParseSection(section) {
-  const text = document.getElementById('msg-' + section).value;
-  const res  = document.getElementById('result-' + section);
+async function testParse() {
+  const text = document.getElementById('msg-test').value;
+  const res  = document.getElementById('result-test');
   if (!text.trim()) {
     res.style.display = 'block';
     res.className = 'parse-result err';
-    res.textContent = '⚠ Escribe o pega el texto del mensaje primero';
+    res.textContent = '⚠ Pega el texto del mensaje primero';
     return;
   }
   res.style.display = 'block';
@@ -601,7 +471,7 @@ async function testParseSection(section) {
       res.className = 'parse-result ok';
       const sig = data.signal;
       res.textContent = '✓ Señal reconocida\n\n'
-        + `Formato:   ${sig.format || '—'}\n`
+        + `Formato:   ${sig.format}\n`
         + `Tipo:      ${sig.type}\n`
         + `Símbolo:   ${sig.symbol}\n`
         + `Dirección: ${sig.direction || '—'}\n`
@@ -613,12 +483,10 @@ async function testParseSection(section) {
       res.className = 'parse-result err';
       res.textContent = '✗ No reconocido\n\nMotivo: ' + data.reason
         + '\n\nFormatos soportados:\n'
-        + '  [LumyArena]\n'
-        + '  Trader acaba de abrir una posición\n'
-        + '  SYMBOL — BUY/SELL X lots | Precio: 0000.00\n\n'
-        + '  [Veritas / Genérico]\n'
-        + '  BUY TRADE XAUUSD\n'
-        + '  ENTRY: 0000 | SL: 0000 | TP: 0000 o OPEN';
+        + '  US30 BUY NOW\n'
+        + '  SELL XAUUSD 4138 / SL 4160 / TP NINGUNO\n'
+        + '  BUY TRADE XAUUSD / ENTRY: 3320 / SL: 3300 / TP: 3360\n'
+        + '  Trader acaba de abrir una posición / XAUUSD — BUY 0.10 lots';
     }
   } catch(e) {
     res.className = 'parse-result err';
