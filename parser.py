@@ -53,7 +53,8 @@ def parse_message(text: str) -> Optional[Signal]:
         return _parse_now_signal(text, m)
 
     # --- Formato DIRECTION SYMBOL PRICE  (ej: "SELL XAUUSD 4138\nSL 4160\nTP NINGUNO") ---
-    m = re.search(r'^(BUY|SELL)\s+([\w./]{2,10})\s+([\d.]{2,12})\s*$',
+    # El precio puede ir seguido de más contenido en la misma línea
+    m = re.search(r'^(BUY|SELL)\s+([\w./]{2,10})\s+([\d.]{2,12})',
                   text, re.IGNORECASE | re.MULTILINE)
     if m:
         return _parse_dir_symbol_price(text, m)
@@ -155,8 +156,10 @@ def _parse_trade_signal(text: str, m) -> Optional[Signal]:
     )
     tp = float(tp_m.group(1)) if tp_m and tp_m.group(1).lower() != 'open' else None
 
-    # Detectar cierre
-    is_close = bool(re.search(r'\b(close|closed|cerrad|tp hit|sl hit|hit tp|hit sl)\b', text, re.IGNORECASE))
+    # Detectar cierre (inglés y español)
+    is_close = bool(re.search(
+        r'\b(close|closed|cerrad|tp hit|sl hit|hit tp|hit sl|cierren|cierra|cerrar|salgan|salir|exit)\b',
+        text, re.IGNORECASE))
 
     return Signal(
         type=SignalType.CLOSE if is_close else SignalType.OPEN,
@@ -222,13 +225,19 @@ def _parse_now_signal(text: str, m) -> Optional[Signal]:
 # Formato DIRECTION SYMBOL PRICE  (PapaEnParis, etc.)
 # ──────────────────────────────────────────
 
+_CLOSE_RE = re.compile(
+    r'\b(close|closed|cerrad|tp hit|sl hit|hit tp|hit sl|cierren|cierra|cerrar|salgan|salir|exit)\b',
+    re.IGNORECASE)
+
 def _parse_dir_symbol_price(text: str, m) -> Optional[Signal]:
     direction = m.group(1).upper()
     symbol    = normalize_symbol(m.group(2))
     price     = float(m.group(3))
-    sl = _find_price(text, r'(?:^|\n)\s*S/?L\s*[:\s]\s*([\d.]+)')
-    tp_m = re.search(r'(?:^|\n)\s*T/?P\s*[:\s]\s*([\d.]+|NINGUNO|NONE|-)',
-                     text, re.IGNORECASE)
+
+    # SL: busca "SL 4200" o "S/L: 4200" en cualquier parte del texto
+    sl = _find_price(text, r'\bS/?L\s*[:\s]\s*([\d.]+)')
+    # TP: acepta NINGUNO/NONE/- como sin TP
+    tp_m = re.search(r'\bT/?P\s*[:\s]\s*([\d.]+|NINGUNO|NONE|-)', text, re.IGNORECASE)
     tp = None
     if tp_m:
         raw = tp_m.group(1).upper()
@@ -237,8 +246,13 @@ def _parse_dir_symbol_price(text: str, m) -> Optional[Signal]:
                 tp = float(raw)
             except ValueError:
                 pass
+
+    # Si el texto contiene palabras de cierre → es un CLOSE del trade referenciado
+    is_close = bool(_CLOSE_RE.search(text))
+
     return Signal(
-        type=SignalType.OPEN, trader=_guess_trader(text),
+        type=SignalType.CLOSE if is_close else SignalType.OPEN,
+        trader=_guess_trader(text),
         symbol_raw=symbol, direction=direction,
         lots=0.0, price=price,
         sl=sl, tp=tp,
