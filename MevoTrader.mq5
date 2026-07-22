@@ -4,7 +4,7 @@
 //|  Requiere: Tools → Options → Expert Advisors → Allow WebRequest  |
 //+------------------------------------------------------------------+
 #property copyright "MevoTrader"
-#property version   "1.11"
+#property version   "1.12"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -52,6 +52,7 @@ struct PendingSignal {
    double   sl;
    double   tp;
    double   pe;
+   string   channel_id;   // ID del canal origen — usado para comment y cierre selectivo
    datetime received_at;
    bool     active;
 };
@@ -119,13 +120,14 @@ void PollServer()
    string body = CharArrayToString(result);
    if(body == "" || body == "null" || StringFind(body, "action") < 0) return;
 
-   string action    = ExtractJSON(body, "action");
-   string signal_id = ExtractJSON(body, "id");
-   string symbol    = ExtractJSON(body, "symbol");
-   string direction = ExtractJSON(body, "direction");
-   double sl        = StringToDouble(ExtractJSON(body, "sl"));
-   double tp        = StringToDouble(ExtractJSON(body, "tp"));
-   double pe        = StringToDouble(ExtractJSON(body, "pe"));
+   string action     = ExtractJSON(body, "action");
+   string signal_id  = ExtractJSON(body, "id");
+   string symbol     = ExtractJSON(body, "symbol");
+   string direction  = ExtractJSON(body, "direction");
+   double sl         = StringToDouble(ExtractJSON(body, "sl"));
+   double tp         = StringToDouble(ExtractJSON(body, "tp"));
+   double pe         = StringToDouble(ExtractJSON(body, "pe"));
+   string channel_id = ExtractJSON(body, "channel_id");
 
    // Quitar sufijo de punto del mensaje (ej: XAUUSD.a → XAUUSD) y homologar
    int dot = StringFind(symbol, ".");
@@ -144,7 +146,7 @@ void PollServer()
    Print("Señal [", signal_id, "]: ", action, " ", broker_symbol, " ", direction);
 
    if(action == "close") {
-      ClosePositions(broker_symbol);
+      ClosePositions(broker_symbol, channel_id);
       AckSignal(signal_id);
       return;
    }
@@ -154,6 +156,7 @@ void PollServer()
       Pending.id = signal_id; Pending.symbol = broker_symbol;
       Pending.direction = direction; Pending.sl = sl;
       Pending.tp = tp; Pending.pe = pe;
+      Pending.channel_id = channel_id;
       Pending.received_at = TimeCurrent();
       Pending.active = true;
       AckSignal(signal_id);
@@ -192,12 +195,12 @@ void CheckPendingSignal()
       }
    }
 
-   ExecuteTrade(Pending.symbol, Pending.direction, Pending.sl, Pending.tp);
+   ExecuteTrade(Pending.symbol, Pending.direction, Pending.sl, Pending.tp, Pending.channel_id);
    Pending.active = false;
 }
 
 //+------------------------------------------------------------------+
-void ExecuteTrade(string symbol, string direction, double sl_price, double tp_price)
+void ExecuteTrade(string symbol, string direction, double sl_price, double tp_price, string channel_id)
 {
    MqlTick tick;
    if(!SymbolInfoTick(symbol, tick)) return;
@@ -229,9 +232,10 @@ void ExecuteTrade(string symbol, string direction, double sl_price, double tp_pr
    Print("Ejecutando ", direction, " ", symbol, " Lots=", lots,
          " Precio=", price, " SL=", sl_price, " TP=", tp_price);
 
+   string comment = (channel_id != "") ? "MEVO_" + channel_id : "MevoTrader";
    bool ok = is_buy
-      ? Trade.Buy(lots,  symbol, price, sl_price, tp_price, "MevoTrader")
-      : Trade.Sell(lots, symbol, price, sl_price, tp_price, "MevoTrader");
+      ? Trade.Buy(lots,  symbol, price, sl_price, tp_price, comment)
+      : Trade.Sell(lots, symbol, price, sl_price, tp_price, comment);
 
    if(!ok) Print("ERROR: ", Trade.ResultRetcodeDescription());
    else    Print("OK — Ticket: ", Trade.ResultOrder());
@@ -292,16 +296,19 @@ void CheckBreakEven()
 }
 
 //+------------------------------------------------------------------+
-void ClosePositions(string symbol)
+void ClosePositions(string symbol, string channel_id)
 {
+   string target = (channel_id != "") ? "MEVO_" + channel_id : "";
    int closed = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--) {
       if(!PosInfo.SelectByIndex(i)) continue;
       if(PosInfo.Magic() != MagicNumber) continue;
       if(PosInfo.Symbol() != symbol) continue;
+      if(target != "" && StringFind(PosInfo.Comment(), target) < 0) continue;
       if(Trade.PositionClose(PosInfo.Ticket())) closed++;
    }
-   Print("Cerradas ", closed, " posiciones de ", symbol);
+   Print("Cerradas ", closed, " posiciones de ", symbol,
+         (target != "") ? " canal=" + target : " (todas)");
 }
 
 bool IsSymbolAllowed(string symbol)

@@ -447,16 +447,17 @@ async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, chan
     callback_id = str(uuid.uuid4())[:8]
 
     signal_data = {
-        "id":        callback_id,
-        "action":    "open" if signal.type == SignalType.OPEN else "close",
-        "symbol":    resolved_symbol,
-        "direction": signal.direction,
-        "sl":        signal.sl or 0.0,
-        "tp":        signal.tp or 0.0,
-        "pe":        signal.price,
-        "status":    "pendiente",
-        "trader":    signal.trader,
-        "channel":   channel_name,
+        "id":         callback_id,
+        "action":     "open" if signal.type == SignalType.OPEN else "close",
+        "symbol":     resolved_symbol,
+        "direction":  signal.direction,
+        "sl":         signal.sl or 0.0,
+        "tp":         signal.tp or 0.0,
+        "pe":         signal.price,
+        "status":     "pendiente",
+        "trader":     signal.trader,
+        "channel":    channel_name,
+        "channel_id": abs(channel_id),
     }
     now = datetime.utcnow()
     signal_data["time"]     = now.strftime("%H:%M")
@@ -566,18 +567,19 @@ def _make_handler(client: TelegramClient):
             else:
                 now = datetime.utcnow()
                 pending_for_ea = {
-                    "id":        str(uuid.uuid4())[:8],
-                    "action":    "open",
-                    "symbol":    resolved,
-                    "direction": signal.direction,
-                    "sl":        signal.sl or 0.0,
-                    "tp":        signal.tp or 0.0,
-                    "pe":        signal.price,
-                    "status":    "auto-aprobada",
-                    "trader":    signal.trader,
-                    "channel":   channel_name,
-                    "time":      now.strftime("%H:%M"),
-                    "datetime":  now.strftime("%d/%m/%Y %H:%M"),
+                    "id":         str(uuid.uuid4())[:8],
+                    "action":     "open",
+                    "symbol":     resolved,
+                    "direction":  signal.direction,
+                    "sl":         signal.sl or 0.0,
+                    "tp":         signal.tp or 0.0,
+                    "pe":         signal.price,
+                    "status":     "auto-aprobada",
+                    "trader":     signal.trader,
+                    "channel":    channel_name,
+                    "channel_id": norm_id,
+                    "time":       now.strftime("%H:%M"),
+                    "datetime":   now.strftime("%d/%m/%Y %H:%M"),
                 }
                 last_signal = pending_for_ea
                 signal_history.append(pending_for_ea)
@@ -595,9 +597,10 @@ def _make_handler(client: TelegramClient):
                 asyncio.create_task(send_confirmation(_bot_ref, signal, resolved))
             else:
                 pending_for_ea = {
-                    "id":     str(uuid.uuid4())[:8],
-                    "action": "close",
-                    "symbol": resolved,
+                    "id":         str(uuid.uuid4())[:8],
+                    "action":     "close",
+                    "symbol":     resolved,
+                    "channel_id": norm_id,
                 }
                 _add_log(f"CLOSE automático → EA — {resolved}")
                 await _bot_ref.send_message(
