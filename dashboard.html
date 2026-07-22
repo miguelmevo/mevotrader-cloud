@@ -80,8 +80,7 @@ button.danger:hover{background:#8b3a3a}
   .ch-stats{gap:4px}
   .ch-stats span{font-size:11px!important;padding:2px 7px!important}
   .ch-actions button{font-size:11px!important;padding:3px 8px!important}
-  .tester-col textarea{min-height:80px}
-  #tester-body{grid-template-columns:1fr!important}
+  #tester-grid{grid-template-columns:1fr!important}
 }
 </style>
 </head>
@@ -148,13 +147,37 @@ button.danger:hover{background:#8b3a3a}
     <div class="card-header" onclick="toggleTester()" style="cursor:pointer;user-select:none">
       <h2>Probar mensaje</h2>
       <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:11px;color:#8b949e">Pega el texto del mensaje del canal</span>
+        <span style="font-size:11px;color:#8b949e">Pega una imagen <strong>o</strong> el texto — solo uno es necesario</span>
         <span id="tester-chevron" style="color:#8b949e;font-size:14px;transition:transform .2s;transform:rotate(-90deg)">▼</span>
       </div>
     </div>
     <div id="tester-body" class="card-body" style="display:none">
-      <textarea id="msg-test" placeholder="Pega aquí el texto exacto del mensaje del canal. Ejemplos:
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" id="tester-grid">
 
+        <!-- Zona imagen -->
+        <div>
+          <div style="font-size:11px;color:#8b949e;margin-bottom:6px">IMAGEN del mensaje</div>
+          <div id="img-zone"
+            onclick="document.getElementById('file-test').click()"
+            ondrop="handleTestDrop(event)" ondragover="event.preventDefault()"
+            style="border:2px dashed #30363d;border-radius:8px;min-height:130px;cursor:pointer;
+                   display:flex;align-items:center;justify-content:center;overflow:hidden;
+                   transition:border-color .2s;position:relative;background:#0d1117">
+            <div id="img-zone-hint" style="text-align:center;color:#8b949e;font-size:13px;padding:16px;pointer-events:none">
+              <div style="font-size:22px;margin-bottom:6px">📷</div>
+              Haz clic, arrastra o pega (Ctrl+V)
+            </div>
+            <img id="preview-test" style="display:none;max-width:100%;max-height:200px;object-fit:contain;border-radius:4px">
+          </div>
+          <input type="file" id="file-test" accept="image/*" style="display:none" onchange="handleTestFile(event)">
+          <button onclick="clearTestImage()" id="btn-clear-img"
+            style="display:none;margin-top:6px;font-size:11px;padding:3px 10px">✕ Quitar imagen</button>
+        </div>
+
+        <!-- Zona texto -->
+        <div>
+          <div style="font-size:11px;color:#8b949e;margin-bottom:6px">TEXTO del mensaje</div>
+          <textarea id="msg-test" placeholder="Ej:
 US30 BUY NOW
 
 SELL XAUUSD 4138
@@ -162,14 +185,13 @@ SL 4160
 TP NINGUNO
 
 BUY TRADE XAUUSD
-ENTRY: 3320 | SL: 3300 | TP: 3360
+ENTRY: 3320 | SL: 3300 | TP: 3360" style="min-height:130px;width:100%;resize:vertical"></textarea>
+        </div>
+      </div>
 
-Trader acaba de abrir una posición
-XAUUSD — BUY 0.10 lots
-Precio: 3320.50" style="min-height:130px;width:100%"></textarea>
-      <div style="display:flex;gap:8px;margin-top:8px">
+      <div style="display:flex;gap:8px;margin-top:12px">
         <button class="primary" onclick="testParse()" style="flex:1">▶ Probar</button>
-        <button onclick="document.getElementById('msg-test').value='';document.getElementById('result-test').style.display='none'">✕ Limpiar</button>
+        <button onclick="clearTest()">✕ Limpiar todo</button>
       </div>
       <div class="parse-result" id="result-test"></div>
     </div>
@@ -449,23 +471,115 @@ async function removeChannel(id) {
   } catch(e) { alert('Error: ' + e.message); }
 }
 
+// ── Tester: imagen ──────────────────────────────
+let _testImgSrc = null;
+
+function setTestImage(src) {
+  _testImgSrc = src;
+  const img = document.getElementById('preview-test');
+  img.src = src;
+  img.style.display = 'block';
+  document.getElementById('img-zone-hint').style.display = 'none';
+  document.getElementById('btn-clear-img').style.display = 'inline-block';
+  document.getElementById('img-zone').style.borderColor = '#58a6ff';
+}
+
+function clearTestImage() {
+  _testImgSrc = null;
+  document.getElementById('preview-test').style.display = 'none';
+  document.getElementById('preview-test').src = '';
+  document.getElementById('img-zone-hint').style.display = 'block';
+  document.getElementById('btn-clear-img').style.display = 'none';
+  document.getElementById('img-zone').style.borderColor = '#30363d';
+  document.getElementById('file-test').value = '';
+}
+
+function clearTest() {
+  clearTestImage();
+  document.getElementById('msg-test').value = '';
+  const res = document.getElementById('result-test');
+  res.style.display = 'none';
+  res.className = 'parse-result';
+}
+
+function handleTestFile(evt) {
+  const file = evt.target.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = e => setTestImage(e.target.result);
+  reader.readAsDataURL(file);
+}
+
+function handleTestDrop(evt) {
+  evt.preventDefault();
+  const file = evt.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = e => setTestImage(e.target.result);
+    reader.readAsDataURL(file);
+  }
+}
+
+document.addEventListener('paste', function(evt) {
+  if (!document.getElementById('tester-body') ||
+      document.getElementById('tester-body').style.display === 'none') return;
+  const items = (evt.clipboardData || evt.originalEvent?.clipboardData)?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = e => setTestImage(e.target.result);
+      reader.readAsDataURL(blob);
+      return;
+    }
+  }
+});
+
+// ── Tester: parseo (texto directo o OCR de imagen) ──
 async function testParse() {
-  const text = document.getElementById('msg-test').value;
+  const text = (document.getElementById('msg-test').value || '').trim();
   const res  = document.getElementById('result-test');
-  if (!text.trim()) {
+
+  if (!text && !_testImgSrc) {
     res.style.display = 'block';
     res.className = 'parse-result err';
-    res.textContent = '⚠ Pega el texto del mensaje primero';
+    res.textContent = '⚠ Pega una imagen o escribe el texto del mensaje';
     return;
   }
+
   res.style.display = 'block';
   res.className = 'parse-result';
+
+  let parseText = text;
+
+  if (!parseText && _testImgSrc) {
+    res.textContent = '🔍 Leyendo imagen...';
+    try {
+      const Tesseract = await loadTesseract();
+      const { data } = await Tesseract.recognize(_testImgSrc, 'eng', {
+        logger: m => { if (m.status === 'recognizing text')
+          res.textContent = `🔍 Leyendo imagen... ${Math.round(m.progress*100)}%`; }
+      });
+      parseText = data.text.trim();
+      if (!parseText) {
+        res.className = 'parse-result err';
+        res.textContent = '✗ No se pudo extraer texto de la imagen\n\nIntenta pegar el texto manualmente en el campo de texto.';
+        return;
+      }
+    } catch(e) {
+      res.className = 'parse-result err';
+      res.textContent = '✗ Error al leer imagen: ' + e.message;
+      return;
+    }
+  }
+
   res.textContent = 'Analizando...';
   try {
     const data = await api('/debug/parse', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({text})
+      body: JSON.stringify({text: parseText})
     });
     if (data.parsed) {
       res.className = 'parse-result ok';
@@ -485,14 +599,25 @@ async function testParse() {
         + '\n\nFormatos soportados:\n'
         + '  US30 BUY NOW\n'
         + '  SELL XAUUSD 4138 / SL 4160 / TP NINGUNO\n'
-        + '  BUY TRADE XAUUSD / ENTRY: 3320 / SL: 3300 / TP: 3360\n'
-        + '  Trader acaba de abrir una posición / XAUUSD — BUY 0.10 lots';
+        + '  BUY TRADE XAUUSD / ENTRY: 3320 / SL: 3300\n'
+        + '  Trader acaba de abrir una posición';
     }
   } catch(e) {
     res.className = 'parse-result err';
     res.textContent = 'Error: ' + e.message
-      + (e.message === '403' ? '\n→ Verifica el secret en la URL (?secret=...)' : '');
+      + (e.message === '403' ? '\n→ Verifica el secret en la URL' : '');
   }
+}
+
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => resolve(window.Tesseract);
+    s.onerror = () => reject(new Error('No se pudo cargar Tesseract'));
+    document.head.appendChild(s);
+  });
 }
 
 const RESULT_COLORS = {'SL':'#f85149','BE':'#8b949e','TP1':'#3fb950','TP2':'#3fb950','TP3':'#3fb950','NO SE EJECUTÓ':'#d29922'};
