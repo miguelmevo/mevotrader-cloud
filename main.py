@@ -423,7 +423,11 @@ async def debug_parse(body: dict, secret: str = Query(...)):
     text = body.get("text", "")
     signal = await parse_signal(text)
     if signal is None:
-        return {"parsed": False, "reason": "Formato no reconocido"}
+        has_ai = bool(os.environ.get("ANTHROPIC_API_KEY"))
+        reason = "Formato no reconocido"
+        if not has_ai:
+            reason += " — IA no activa (falta ANTHROPIC_API_KEY en Railway)"
+        return {"parsed": False, "reason": reason, "ai_available": has_ai}
     return {"parsed": True, "signal": {
         "type":      signal.type.value,
         "symbol":    signal.symbol_raw,
