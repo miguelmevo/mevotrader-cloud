@@ -14,6 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from telethon import TelegramClient, events
@@ -339,11 +340,88 @@ async def api_annotate_signal(signal_id: str, body: dict, secret: str = Query(..
     _save_channel_stats()
     return {"ok": found}
 
+_AI_PROMPT = """Eres un parser de señales de trading de canales de Telegram.
+Analiza el mensaje y extrae la señal de trading si existe.
+
+Responde SOLO con JSON válido, sin explicaciones ni markdown.
+
+Si es señal de APERTURA (nueva entrada):
+{"type":"open","symbol":"XAUUSD","direction":"BUY","entry":3320.0,"sl":3300.0,"tp":3360.0}
+
+Si es señal de CIERRE (cerrar posición):
+{"type":"close","symbol":"XAUUSD","direction":"SELL","pips":60}
+
+Si NO es una señal de trading:
+null
+
+Reglas:
+- Palabras de cierre: CIERREN, CIERRE, CERRAR, CLOSE, CLOSED, TP HIT, SL HIT, +X PIPS CIERREN, salir
+- Palabras de apertura: BUY, SELL, ENTRY, ABRIR, NOW, nueva entrada
+- symbol: sin barras (XAUUSD no XAU/USD), en mayúsculas
+- tp/sl: null si dice NINGUNO, NONE, NO TP, NO SL o no menciona
+- Si el mensaje menciona un trade previo Y luego dice CIERREN → es CIERRE de ese trade
+- direction en cierre = dirección del trade original que se cierra
+
+Mensaje:
+{text}"""
+
+async def _parse_with_ai(text: str) -> Optional[Signal]:
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            r = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-haiku-4-5-20251001",
+                    "max_tokens": 128,
+                    "messages": [{"role": "user", "content": _AI_PROMPT.format(text=text)}],
+                },
+            )
+        if r.status_code != 200:
+            log.warning("AI parser HTTP %s", r.status_code)
+            return None
+        raw = r.json()["content"][0]["text"].strip()
+        if not raw or raw.lower() == "null":
+            return None
+        data = json.loads(raw)
+        sig_type = SignalType.CLOSE if data.get("type") == "close" else SignalType.OPEN
+        from parser import normalize_symbol, _guess_trader
+        symbol = normalize_symbol(data.get("symbol", ""))
+        return Signal(
+            type=sig_type,
+            trader=_guess_trader(text),
+            symbol_raw=symbol,
+            direction=data.get("direction", "BUY").upper(),
+            lots=0.0,
+            price=float(data.get("entry") or data.get("close_price") or 0.0),
+            sl=float(data["sl"]) if data.get("sl") else None,
+            tp=float(data["tp"]) if data.get("tp") else None,
+            format="ai",
+            raw_text=text,
+        )
+    except Exception as e:
+        log.warning("AI parser error: %s", e)
+        return None
+
+async def parse_signal(text: str) -> Optional[Signal]:
+    """Intenta regex primero; si falla, usa IA como fallback."""
+    signal = parse_message(text)
+    if signal is None:
+        signal = await _parse_with_ai(text)
+    return signal
+
 @app.post("/debug/parse")
 async def debug_parse(body: dict, secret: str = Query(...)):
     check_secret(secret)
     text = body.get("text", "")
-    signal = parse_message(text)
+    signal = await parse_signal(text)
     if signal is None:
         return {"parsed": False, "reason": "Formato no reconocido"}
     return {"parsed": True, "signal": {
@@ -458,7 +536,7 @@ def _make_handler(client: TelegramClient):
         if chat_id in extra_channels and not extra_channels[chat_id].get("active", True):
             return
         text   = event.raw_text
-        signal = parse_message(text)
+        signal = await parse_signal(text)
         if not signal:
             return
 
