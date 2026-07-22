@@ -4,7 +4,7 @@
 //|  Requiere: Tools → Options → Expert Advisors → Allow WebRequest  |
 //+------------------------------------------------------------------+
 #property copyright "MevoTrader"
-#property version   "1.12"
+#property version   "1.13"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -232,7 +232,7 @@ void ExecuteTrade(string symbol, string direction, double sl_price, double tp_pr
    Print("Ejecutando ", direction, " ", symbol, " Lots=", lots,
          " Precio=", price, " SL=", sl_price, " TP=", tp_price);
 
-   string comment = (channel_id != "") ? "MEVO_" + channel_id : "MevoTrader";
+   string comment = (channel_id != "") ? "MEVO_" + ChShort(channel_id) : "MevoTrader";
    bool ok = is_buy
       ? Trade.Buy(lots,  symbol, price, sl_price, tp_price, comment)
       : Trade.Sell(lots, symbol, price, sl_price, tp_price, comment);
@@ -296,9 +296,14 @@ void CheckBreakEven()
 }
 
 //+------------------------------------------------------------------+
+string ChShort(string ch) {
+   int len = StringLen(ch);
+   return (len > 5) ? StringSubstr(ch, len - 5) : ch;
+}
+
 void ClosePositions(string symbol, string channel_id)
 {
-   string target = (channel_id != "") ? "MEVO_" + channel_id : "";
+   string target = (channel_id != "") ? "MEVO_" + ChShort(channel_id) : "";
    int closed = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--) {
       if(!PosInfo.SelectByIndex(i)) continue;
