@@ -437,6 +437,13 @@ async function loadChannels() {
       </li>`;
     }).join('');
     document.getElementById('stat-channels').textContent = data.channels.length;
+    // Restaurar filas que estaban abiertas antes del re-render
+    _openHistories.forEach(id => {
+      const el = document.getElementById(id);
+      const chev = document.getElementById('chev-' + id.replace('hist-', ''));
+      if (el) { el.style.display = 'block'; }
+      if (chev) chev.style.transform = 'rotate(0deg)';
+    });
   } catch(e) {
     document.getElementById('channel-list').innerHTML = '<li class="empty">Error cargando canales</li>';
   }
@@ -646,12 +653,16 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+const _openHistories = new Set();
+
 function toggleChannelHistory(id) {
   const el = document.getElementById(id);
   const chev = document.getElementById('chev-' + id.replace('hist-', ''));
   const isOpen = el.style.display !== 'none';
   el.style.display = isOpen ? 'none' : 'block';
   if (chev) chev.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+  if (isOpen) _openHistories.delete(id);
+  else _openHistories.add(id);
 }
 
 function toggleTester() {
