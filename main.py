@@ -475,9 +475,9 @@ async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, chan
 
     is_open = signal.type == SignalType.OPEN
     text = (
-        notifier.format_open_message(signal, resolved_symbol, 0)
+        notifier.format_open_message(signal, resolved_symbol, 0, channel_name)
         if is_open
-        else notifier.format_close_message(signal, resolved_symbol)
+        else notifier.format_close_message(signal, resolved_symbol, channel_name)
     )
 
     keyboard = InlineKeyboardMarkup([[
@@ -589,7 +589,7 @@ def _make_handler(client: TelegramClient):
                 _add_log(f"AUTO-APROBADA {resolved} {signal.direction}")
                 await _bot_ref.send_message(
                     chat_id=cfg["telegram"]["admin_chat_id"],
-                    text=f"⚡ Auto-aprobada — {resolved} {signal.direction} @ {signal.price}",
+                    text=f"⚡ Auto-aprobada — {resolved} {signal.direction} @ {signal.price}\n📢 Canal: {channel_name}",
                 )
         elif signal.type == SignalType.CLOSE:
             close_confirm = cfg["trading"].get("close_requires_confirmation", False)
@@ -605,7 +605,7 @@ def _make_handler(client: TelegramClient):
                 _add_log(f"CLOSE automático → EA — {resolved}")
                 await _bot_ref.send_message(
                     chat_id=cfg["telegram"]["admin_chat_id"],
-                    text=f"🔴 Cierre automático enviado al EA — {resolved}",
+                    text=f"🔴 Cierre automático enviado al EA — {resolved}\n📢 Canal: {channel_name}",
                 )
     return on_message
 

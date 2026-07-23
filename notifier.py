@@ -25,26 +25,30 @@ def desktop_notification(title: str, body: str, subtitle: str = ""):
             log.warning("Windows notification falló: %s", e)
 
 
-def format_open_message(signal: Signal, resolved_symbol: str, lots: float) -> str:
+def format_open_message(signal: Signal, resolved_symbol: str, lots: float, channel_name: str = "") -> str:
     sl_str = f"\nSL: `{signal.sl}`" if signal.sl else ""
     tp_str = f"\nTP: `{signal.tp}`" if signal.tp else ""
+    ch_str = f"\n📢 Canal: *{channel_name}*" if channel_name and channel_name != "—" else ""
     return (
         f"📡 *NUEVA SEÑAL — {signal.trader}*\n\n"
         f"*{resolved_symbol}* — `{signal.direction}`\n"
         f"Precio: `{signal.price}`"
-        f"{sl_str}{tp_str}\n\n"
+        f"{sl_str}{tp_str}"
+        f"{ch_str}\n\n"
         f"¿Abrir esta operación?"
     )
 
 
-def format_close_message(signal: Signal, resolved_symbol: str) -> str:
+def format_close_message(signal: Signal, resolved_symbol: str, channel_name: str = "") -> str:
     pips_str = f"{signal.pips:+.1f} pips" if signal.pips is not None else "—"
     profit_str = signal.profit or "—"
+    ch_str = f"\n📢 Canal: *{channel_name}*" if channel_name and channel_name != "—" else ""
     return (
         f"🔴 *CIERRE — {signal.trader}*\n\n"
         f"*{resolved_symbol}* — `{signal.direction}`\n"
         f"Apertura: `{signal.open_price}` → Cierre: `{signal.close_price}`\n"
-        f"Resultado señal: `{pips_str}` | `{profit_str}`\n\n"
+        f"Resultado señal: `{pips_str}` | `{profit_str}`"
+        f"{ch_str}\n\n"
         f"¿Cerrar tu posición?"
     )
 
