@@ -59,6 +59,11 @@ def parse_message(text: str) -> Optional[Signal]:
     if m:
         return _parse_dir_symbol_price(text, m)
 
+    # --- Formato BUY/SELL SYMBOL ... Entrada: PRICE[-PRICE2]  (español, con rango) ---
+    m = re.search(r'^(BUY|SELL)\s+([\w./]{2,10})', text, re.IGNORECASE | re.MULTILINE)
+    if m and re.search(r'Entrada\s*[:\s]', text, re.IGNORECASE):
+        return _parse_entrada_signal(text, m)
+
     # --- Formato genérico: BUY/SELL SYMBOL (sin TRADE) ---
     m = re.search(r'^(BUY|SELL)\s+([\w.]+)', text, re.IGNORECASE | re.MULTILINE)
     if m and re.search(r'ENTRY\s*[:\s]', text, re.IGNORECASE):
@@ -257,6 +262,37 @@ def _parse_dir_symbol_price(text: str, m) -> Optional[Signal]:
         lots=0.0, price=price,
         sl=sl, tp=tp,
         format="dir_symbol_price", raw_text=text,
+    )
+
+
+# ──────────────────────────────────────────
+# Formato BUY/SELL SYMBOL ... Entrada: PRICE[-PRICE2]  (español, canales latam)
+# ──────────────────────────────────────────
+
+def _parse_entrada_signal(text: str, m) -> Optional[Signal]:
+    direction = m.group(1).upper()
+    symbol    = normalize_symbol(m.group(2))
+
+    # Acepta "Entrada: 4165" o "Entrada: 4165-4163" — toma el primer número
+    entry_m = re.search(r'Entrada\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
+    if not entry_m:
+        return None
+    price = float(entry_m.group(1))
+
+    sl = _find_price(text, r'\bS/?L\s*[:\s]\s*([\d.]+)')
+    # TP1 como TP primario; si no hay TP1 busca TP genérico
+    tp_m = re.search(r'\bTP1?\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
+    tp = float(tp_m.group(1)) if tp_m else None
+
+    is_close = bool(_CLOSE_RE.search(text))
+
+    return Signal(
+        type=SignalType.CLOSE if is_close else SignalType.OPEN,
+        trader=_guess_trader(text),
+        symbol_raw=symbol, direction=direction,
+        lots=0.0, price=price,
+        sl=sl, tp=tp,
+        format="entrada_signal", raw_text=text,
     )
 
 
