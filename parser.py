@@ -28,6 +28,7 @@ class Signal:
     close_price: Optional[float] = None
     pips: Optional[float] = None
     profit: Optional[str] = None
+    price_low: Optional[float] = None   # límite inferior del rango de entrada
     format: str = "unknown"
     raw_text: str = ""
 
@@ -273,11 +274,12 @@ def _parse_entrada_signal(text: str, m) -> Optional[Signal]:
     direction = m.group(1).upper()
     symbol    = normalize_symbol(m.group(2))
 
-    # Acepta "Entrada: 4165" o "Entrada: 4165-4163" — toma el primer número
-    entry_m = re.search(r'Entrada\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
+    # Acepta "Entrada: 4165" o "Entrada: 4165-4163" — captura rango si existe
+    entry_m = re.search(r'Entrada\s*[:\s]\s*([\d.]+)(?:\s*-\s*([\d.]+))?', text, re.IGNORECASE)
     if not entry_m:
         return None
     price = float(entry_m.group(1))
+    price_low = float(entry_m.group(2)) if entry_m.group(2) else None
 
     sl = _find_price(text, r'\bS/?L\s*[:\s]\s*([\d.]+)')
     # TP1 como TP primario; si no hay TP1 busca TP genérico
@@ -290,7 +292,7 @@ def _parse_entrada_signal(text: str, m) -> Optional[Signal]:
         type=SignalType.CLOSE if is_close else SignalType.OPEN,
         trader=_guess_trader(text),
         symbol_raw=symbol, direction=direction,
-        lots=0.0, price=price,
+        lots=0.0, price=price, price_low=price_low,
         sl=sl, tp=tp,
         format="entrada_signal", raw_text=text,
     )

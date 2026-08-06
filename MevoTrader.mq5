@@ -4,7 +4,7 @@
 //|  Requiere: Tools → Options → Expert Advisors → Allow WebRequest  |
 //+------------------------------------------------------------------+
 #property copyright "MevoTrader"
-#property version   "1.13"
+#property version   "1.14"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -52,6 +52,7 @@ struct PendingSignal {
    double   sl;
    double   tp;
    double   pe;
+   double   pe_low;       // límite inferior del rango de entrada (0 = sin rango)
    string   channel_id;   // ID del canal origen — usado para comment y cierre selectivo
    datetime received_at;
    bool     active;
@@ -128,6 +129,7 @@ void PollServer()
    double tp         = StringToDouble(ExtractJSON(body, "tp"));
    double pe         = StringToDouble(ExtractJSON(body, "pe"));
    string channel_id = ExtractJSON(body, "channel_id");
+   double pe_low     = StringToDouble(ExtractJSON(body, "pe_low"));
 
    // Quitar sufijo de punto del mensaje (ej: XAUUSD.a → XAUUSD) y homologar
    int dot = StringFind(symbol, ".");
@@ -155,7 +157,7 @@ void PollServer()
       if(Pending.active && Pending.id == signal_id) return;
       Pending.id = signal_id; Pending.symbol = broker_symbol;
       Pending.direction = direction; Pending.sl = sl;
-      Pending.tp = tp; Pending.pe = pe;
+      Pending.tp = tp; Pending.pe = pe; Pending.pe_low = pe_low;
       Pending.channel_id = channel_id;
       Pending.received_at = TimeCurrent();
       Pending.active = true;
@@ -186,7 +188,16 @@ void CheckPendingSignal()
    double tick_size = SymbolInfoDouble(Pending.symbol, SYMBOL_TRADE_TICK_SIZE);
    double price_now = (Pending.direction == "BUY") ? tick.ask : tick.bid;
 
-   if(Pending.pe > 0) {
+   if(Pending.pe_low > 0) {
+      // Rango de entrada definido — verificar que el precio esté dentro
+      double range_hi = MathMax(Pending.pe, Pending.pe_low);
+      double range_lo = MathMin(Pending.pe, Pending.pe_low);
+      if(price_now < range_lo || price_now > range_hi) {
+         Print("Señal cancelada — precio ", price_now, " fuera del rango [", range_lo, "-", range_hi, "]");
+         Pending.active = false;
+         return;
+      }
+   } else if(Pending.pe > 0) {
       double deviation = MathAbs(price_now - Pending.pe) / tick_size;
       if(deviation > MaxDeviationTicks) {
          Print("Señal cancelada — desviación ", DoubleToString(deviation,1), " ticks");
