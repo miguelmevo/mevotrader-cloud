@@ -439,6 +439,54 @@ async def debug_parse(body: dict, secret: str = Query(...)):
         "format":    signal.format,
     }}
 
+@app.post("/debug/suggest-parser")
+async def suggest_parser(body: dict, secret: str = Query(...)):
+    check_secret(secret)
+    text = body.get("text", "")
+    if not text:
+        return {"ok": False, "reason": "Texto vacío"}
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "reason": "Falta ANTHROPIC_API_KEY en Railway"}
+
+    prompt = f"""Eres un experto en parsing de señales de trading de Telegram.
+
+Analiza este mensaje de señal y genera una función Python llamada `_parse_custom_NOMBRE(text, m)`
+que lo parsee correctamente. Usa el mismo patrón que estas funciones existentes:
+- Retorna un objeto Signal(type, trader, symbol_raw, direction, lots, price, sl, tp, format, raw_text)
+- SignalType.OPEN para abrir, SignalType.CLOSE para cerrar
+- direction: "BUY" o "SELL"
+- price=0.0 si es mercado
+- sl y tp son float o None
+
+También genera el bloque `if` para agregarlo en la función `parse_message()`.
+
+Mensaje a parsear:
+\"\"\"
+{text}
+\"\"\"
+
+Responde SOLO con el código Python, sin explicaciones adicionales."""
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1024,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
+    if resp.status_code != 200:
+        return {"ok": False, "reason": f"API error {resp.status_code}"}
+    code = resp.json()["content"][0]["text"].strip()
+    return {"ok": True, "code": code}
+
 # -------------------------------------------------------------------
 # Confirmación via Telegram bot
 # -------------------------------------------------------------------

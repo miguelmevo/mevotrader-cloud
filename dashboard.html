@@ -191,6 +191,7 @@ ENTRY: 3320 | SL: 3300 | TP: 3360" style="min-height:130px;width:100%;resize:ver
 
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="primary" onclick="testParse()" style="flex:1">▶ Probar</button>
+        <button onclick="suggestParser()" style="background:#1a1f2e;border:1px solid #388bfd;color:#388bfd;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px" title="Si el formato no es reconocido, Claude analiza la estructura y sugiere el código Python para agregarlo">🤖 Sugerir parser</button>
         <button onclick="clearTest()">✕ Limpiar todo</button>
       </div>
       <div class="parse-result" id="result-test"></div>
@@ -507,6 +508,37 @@ function clearTest() {
   const res = document.getElementById('result-test');
   res.style.display = 'none';
   res.className = 'parse-result';
+}
+
+async function suggestParser() {
+  const text = document.getElementById('msg-test').value.trim();
+  const res  = document.getElementById('result-test');
+  if (!text) { alert('Pega el texto del mensaje primero, luego haz clic en Sugerir parser.'); return; }
+  res.style.display = 'block';
+  res.className = 'parse-result';
+  res.style.background = '#0d1117';
+  res.style.borderColor = '#388bfd';
+  res.style.color = '#e6edf3';
+  res.textContent = '🤖 Claude analizando el formato...';
+  try {
+    const data = await api('/debug/suggest-parser', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text}),
+    });
+    if (!data.ok) {
+      res.className = 'parse-result err';
+      res.textContent = '❌ ' + data.reason;
+      return;
+    }
+    res.style.background = '#0d1a2e';
+    res.style.borderColor = '#388bfd';
+    res.style.color = '#79c0ff';
+    res.textContent = '💡 Código sugerido por Claude (compártelo para agregarlo al parser):\n\n' + data.code;
+  } catch(e) {
+    res.className = 'parse-result err';
+    res.textContent = '❌ Error: ' + e.message;
+  }
 }
 
 function handleTestFile(evt) {

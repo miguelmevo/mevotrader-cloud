@@ -43,6 +43,11 @@ def parse_message(text: str) -> Optional[Signal]:
     if "acaba de cerrar una posición" in text:
         return _parse_lumy_close(text)
 
+    # --- Formato LONG/SHORT en (SYMBOL Activo) ---
+    m = re.search(r'\b(LONG|SHORT)\s+en\s+\(([A-Z0-9./]{2,10})\s+Activo\)', text, re.IGNORECASE)
+    if m:
+        return _parse_long_short(text, m)
+
     # --- Formato genérico: BUY/SELL TRADE SYMBOL ---
     m = re.search(r'\b(BUY|SELL)\s+TRADE\s+([\w.]+)', text, re.IGNORECASE)
     if m:
@@ -263,6 +268,29 @@ def _parse_dir_symbol_price(text: str, m) -> Optional[Signal]:
         lots=0.0, price=price,
         sl=sl, tp=tp,
         format="dir_symbol_price", raw_text=text,
+    )
+
+
+# ──────────────────────────────────────────
+# Formato LONG/SHORT en (SYMBOL Activo)
+# ──────────────────────────────────────────
+
+def _parse_long_short(text: str, m) -> Optional[Signal]:
+    direction = "BUY" if m.group(1).upper() == "LONG" else "SELL"
+    symbol    = normalize_symbol(m.group(2))
+    sl = _find_price(text, r'\bS/?L\s*[:\s]\s*([\d.]+)')
+    tp_m = re.search(r'\bTP1?\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
+    tp = float(tp_m.group(1)) if tp_m else None
+    entry_m = re.search(r'Entrada\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
+    price = float(entry_m.group(1)) if entry_m else 0.0
+    is_close = bool(_CLOSE_RE.search(text))
+    return Signal(
+        type=SignalType.CLOSE if is_close else SignalType.OPEN,
+        trader=_guess_trader(text),
+        symbol_raw=symbol, direction=direction,
+        lots=0.0, price=price,
+        sl=sl, tp=tp,
+        format="long_short", raw_text=text,
     )
 
 
