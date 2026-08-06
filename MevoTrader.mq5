@@ -4,7 +4,7 @@
 //|  Requiere: Tools → Options → Expert Advisors → Allow WebRequest  |
 //+------------------------------------------------------------------+
 #property copyright "MevoTrader"
-#property version   "1.14"
+#property version   "1.15"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -29,7 +29,8 @@ input ENUM_LOT_MODE LotMode    = LOT_FIXED;
 input double        LotValue   = 0.10;   // Lotes si FIJO, % balance si PORCENTAJE
 
 input group "═══ SL / TP ═══"
-input int    DefaultSL_Ticks   = 50;     // SL en ticks si señal no trae SL
+input int    DefaultSL_Ticks   = 50;     // SL en ticks si señal no trae SL (fallback global)
+input string DefaultSL_Map     = "XAUUSD:500,DJ30ft:700,EURUSD:300,GBPUSD:300"; // SL por instrumento (sin sufijo)
 input double RR                = 2.0;    // Risk:Reward para calcular TP
 
 input group "═══ OFFSET Y FILTROS ═══"
@@ -225,10 +226,18 @@ void ExecuteTrade(string symbol, string direction, double sl_price, double tp_pr
       : tick.bid - OffsetTicks * tick_size;
    price = NormalizeDouble(price, digits);
 
-   if(sl_price <= 0)
+   if(sl_price <= 0) {
+      // Quitar sufijo del broker para buscar en el mapa
+      string base = symbol;
+      if(SymbolSuffix != "") {
+         int suf_pos = StringFind(symbol, SymbolSuffix);
+         if(suf_pos > 0) base = StringSubstr(symbol, 0, suf_pos);
+      }
+      int sl_ticks = GetDefaultSL(base);
       sl_price = is_buy
-         ? price - DefaultSL_Ticks * tick_size
-         : price + DefaultSL_Ticks * tick_size;
+         ? price - sl_ticks * tick_size
+         : price + sl_ticks * tick_size;
+   }
    sl_price = NormalizeDouble(sl_price, digits);
 
    if(tp_price <= 0) {
@@ -307,6 +316,24 @@ void CheckBreakEven()
 }
 
 //+------------------------------------------------------------------+
+// Devuelve el SL en ticks para el símbolo dado (sin sufijo), buscando en DefaultSL_Map
+// Si no encuentra, retorna DefaultSL_Ticks global
+int GetDefaultSL(string base_symbol) {
+   string map = DefaultSL_Map + ",";
+   string search = base_symbol + ":";
+   int pos = StringFind(map, search);
+   if(pos < 0) return DefaultSL_Ticks;
+   pos += StringLen(search);
+   string val = "";
+   for(int i = pos; i < StringLen(map); i++) {
+      ushort c = StringGetCharacter(map, i);
+      if(c == ',' || c == '}') break;
+      val += ShortToString(c);
+   }
+   int ticks = (int)StringToInteger(val);
+   return (ticks > 0) ? ticks : DefaultSL_Ticks;
+}
+
 string ChShort(string ch) {
    int len = StringLen(ch);
    return (len > 5) ? StringSubstr(ch, len - 5) : ch;
