@@ -537,6 +537,9 @@ async function suggestParser() {
     _lastSuggestedText   = data.text;
     _lastSuggestedSignal = data.signal;
     const s = data.signal;
+    const conf = data.confidence || 'medium';
+    const confColor = conf === 'high' ? '#3fb950' : conf === 'medium' ? '#d29922' : '#f85149';
+    const confLabel = conf === 'high' ? '🟢 Alta' : conf === 'medium' ? '🟡 Media' : '🔴 Baja';
     const dirColor = s.direction === 'BUY' ? '#3fb950' : '#f85149';
     res.innerHTML = `
       <div style="margin-bottom:10px;font-size:13px;color:#79c0ff;font-weight:600">🤖 Claude detectó esta señal:</div>
@@ -544,9 +547,10 @@ async function suggestParser() {
         <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Tipo</td><td style="color:#e6edf3">${s.type === 'open' ? '🟢 Apertura' : '🔴 Cierre'}</td></tr>
         <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Símbolo</td><td style="color:#e6edf3;font-weight:600">${s.symbol}</td></tr>
         <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Dirección</td><td style="color:${dirColor};font-weight:600">${s.direction}</td></tr>
-        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Precio</td><td style="color:#e6edf3">${s.entry > 0 ? s.entry : 'Mercado'}</td></tr>
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Precio entrada</td><td style="color:#e6edf3">${s.entry > 0 ? s.entry : 'Mercado'}</td></tr>
         <tr><td style="color:#8b949e;padding:2px 12px 2px 0">SL</td><td style="color:#f85149">${s.sl ?? '—'}</td></tr>
         <tr><td style="color:#8b949e;padding:2px 12px 2px 0">TP</td><td style="color:#3fb950">${s.tp ?? '—'}</td></tr>
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Confianza</td><td style="color:${confColor}">${confLabel}</td></tr>
       </table>
       <div style="margin-top:14px;font-size:12px;color:#8b949e">¿Agregar este formato al sistema para que se reconozca automáticamente?</div>
       <div style="display:flex;gap:8px;margin-top:8px">

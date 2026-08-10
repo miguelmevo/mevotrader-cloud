@@ -459,6 +459,60 @@ async def debug_parse(body: dict, secret: str = Query(...)):
         "format":    signal.format,
     }}
 
+_SUGGEST_PROMPT = """Eres un experto en señales de trading de Telegram.
+
+Analiza este mensaje e intenta extraer una señal de trading. Sé inteligente:
+- Si no hay símbolo explícito, infíerelo por el rango de precio (ej: 4200-4400 → XAUUSD, 1.08 → EURUSD, 40000 → DJ30ft/US30)
+- Si no hay BUY/SELL explícito, inferirlo por la posición del SL vs TP vs entrada (TP > entrada → BUY, TP < entrada → SELL)
+- 📍 o 🎯 suelen indicar el precio de entrada
+- ✅ o 💰 suelen indicar Take Profit
+- 🔴 o 🚫 suelen indicar Stop Loss
+- LONG = BUY, SHORT = SELL
+
+Responde SOLO con JSON válido, sin explicaciones. Campos:
+- type: "open" o "close"
+- symbol: símbolo en mayúsculas sin barras (XAUUSD, EURUSD, DJ30ft, etc.)
+- direction: "BUY" o "SELL"
+- entry: precio de entrada (primer número del rango si hay rango), 0 si es mercado
+- sl: stop loss como número, null si no hay
+- tp: take profit primario (TP1 si hay varios), null si no hay
+- confidence: "high", "medium" o "low" según qué tan seguro estás
+
+Si definitivamente no es una señal de trading: null
+
+Mensaje:
+{text}"""
+
+async def _parse_suggest(text: str) -> Optional[dict]:
+    """Parser más permisivo para el tester — infiere datos faltantes."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-haiku-4-5-20251001",
+                    "max_tokens": 200,
+                    "messages": [{"role": "user", "content": _SUGGEST_PROMPT.format(text=text)}],
+                },
+            )
+        if r.status_code != 200:
+            return None
+        raw = r.json()["content"][0]["text"].strip()
+        if not raw or raw.lower() == "null":
+            return None
+        return json.loads(raw)
+    except Exception as e:
+        log.warning("_parse_suggest error: %s", e)
+        return None
+
 @app.post("/debug/suggest-parser")
 async def suggest_parser(body: dict, secret: str = Query(...)):
     check_secret(secret)
@@ -467,17 +521,18 @@ async def suggest_parser(body: dict, secret: str = Query(...)):
         return {"ok": False, "reason": "Texto vacío"}
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return {"ok": False, "reason": "Falta ANTHROPIC_API_KEY en Railway"}
-    signal = await _parse_with_ai(text)
-    if signal is None:
+    data = await _parse_suggest(text)
+    if data is None:
         return {"ok": False, "reason": "Claude no pudo interpretar este mensaje como señal de trading"}
-    return {"ok": True, "signal": {
-        "type":      signal.type.value,
-        "symbol":    signal.symbol_raw,
-        "direction": signal.direction,
-        "entry":     signal.price,
-        "sl":        signal.sl,
-        "tp":        signal.tp,
-    }, "text": text}
+    signal = {
+        "type":      data.get("type", "open"),
+        "symbol":    data.get("symbol", ""),
+        "direction": data.get("direction", "BUY"),
+        "entry":     float(data.get("entry") or 0),
+        "sl":        float(data["sl"]) if data.get("sl") else None,
+        "tp":        float(data["tp"]) if data.get("tp") else None,
+    }
+    return {"ok": True, "signal": signal, "confidence": data.get("confidence", "medium"), "text": text}
 
 @app.post("/debug/learn-format")
 async def learn_format(body: dict, secret: str = Query(...)):
