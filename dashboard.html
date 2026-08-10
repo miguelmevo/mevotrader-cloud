@@ -510,16 +510,17 @@ function clearTest() {
   res.className = 'parse-result';
 }
 
+let _lastSuggestedText = '';
+let _lastSuggestedSignal = null;
+
 async function suggestParser() {
   const text = document.getElementById('msg-test').value.trim();
   const res  = document.getElementById('result-test');
-  if (!text) { alert('Pega el texto del mensaje primero, luego haz clic en Sugerir parser.'); return; }
+  if (!text) { alert('Pega el texto del mensaje primero.'); return; }
   res.style.display = 'block';
   res.className = 'parse-result';
-  res.style.background = '#0d1117';
-  res.style.borderColor = '#388bfd';
-  res.style.color = '#e6edf3';
-  res.textContent = '🤖 Claude analizando el formato...';
+  res.style.cssText = 'display:block;background:#0d1a2e;border:1px solid #388bfd;color:#e6edf3;border-radius:6px;padding:12px 14px;font-family:SF Mono,Consolas,monospace;font-size:12px;line-height:1.7;margin-top:14px';
+  res.innerHTML = '🤖 Claude analizando el mensaje...';
   try {
     const data = await api('/debug/suggest-parser', {
       method: 'POST',
@@ -527,17 +528,55 @@ async function suggestParser() {
       body: JSON.stringify({text}),
     });
     if (!data.ok) {
-      res.className = 'parse-result err';
+      res.style.background = '#2d1117';
+      res.style.borderColor = '#6e2e2e';
+      res.style.color = '#f85149';
       res.textContent = '❌ ' + data.reason;
       return;
     }
-    res.style.background = '#0d1a2e';
-    res.style.borderColor = '#388bfd';
-    res.style.color = '#79c0ff';
-    res.textContent = '💡 Código sugerido por Claude (compártelo para agregarlo al parser):\n\n' + data.code;
+    _lastSuggestedText   = data.text;
+    _lastSuggestedSignal = data.signal;
+    const s = data.signal;
+    const dirColor = s.direction === 'BUY' ? '#3fb950' : '#f85149';
+    res.innerHTML = `
+      <div style="margin-bottom:10px;font-size:13px;color:#79c0ff;font-weight:600">🤖 Claude detectó esta señal:</div>
+      <table style="border-collapse:collapse;width:100%">
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Tipo</td><td style="color:#e6edf3">${s.type === 'open' ? '🟢 Apertura' : '🔴 Cierre'}</td></tr>
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Símbolo</td><td style="color:#e6edf3;font-weight:600">${s.symbol}</td></tr>
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Dirección</td><td style="color:${dirColor};font-weight:600">${s.direction}</td></tr>
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Precio</td><td style="color:#e6edf3">${s.entry > 0 ? s.entry : 'Mercado'}</td></tr>
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">SL</td><td style="color:#f85149">${s.sl ?? '—'}</td></tr>
+        <tr><td style="color:#8b949e;padding:2px 12px 2px 0">TP</td><td style="color:#3fb950">${s.tp ?? '—'}</td></tr>
+      </table>
+      <div style="margin-top:14px;font-size:12px;color:#8b949e">¿Agregar este formato al sistema para que se reconozca automáticamente?</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="confirmLearnFormat()" style="background:#0d2818;border:1px solid #238636;color:#3fb950;border-radius:6px;padding:5px 18px;cursor:pointer;font-size:13px">✅ Sí, agregar</button>
+        <button onclick="document.getElementById('result-test').style.display='none'" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:5px 18px;cursor:pointer;font-size:13px">❌ No</button>
+      </div>`;
   } catch(e) {
-    res.className = 'parse-result err';
+    res.style.background = '#2d1117';
+    res.style.borderColor = '#6e2e2e';
+    res.style.color = '#f85149';
     res.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+async function confirmLearnFormat() {
+  const res = document.getElementById('result-test');
+  if (!_lastSuggestedText || !_lastSuggestedSignal) return;
+  try {
+    const data = await api('/debug/learn-format', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({text: _lastSuggestedText, signal: _lastSuggestedSignal}),
+    });
+    if (data.ok) {
+      res.innerHTML = `<span style="color:#3fb950">✅ Formato guardado. El sistema ahora reconocerá mensajes similares (${data.total} formatos aprendidos en total).</span>`;
+    } else {
+      res.innerHTML = `<span style="color:#f85149">❌ ${data.reason}</span>`;
+    }
+  } catch(e) {
+    res.innerHTML = `<span style="color:#f85149">❌ Error: ${e.message}</span>`;
   }
 }
 

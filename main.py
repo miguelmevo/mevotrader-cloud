@@ -33,9 +33,10 @@ log = logging.getLogger("main")
 CONFIG_PATH = Path(__file__).parent / "config.json"
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
-CHANNELS_PATH = DATA_DIR / "channels.json"
-LOG_PATH      = DATA_DIR / "activity_log.json"
-STATS_PATH    = DATA_DIR / "channel_stats.json"
+CHANNELS_PATH  = DATA_DIR / "channels.json"
+LOG_PATH       = DATA_DIR / "activity_log.json"
+STATS_PATH     = DATA_DIR / "channel_stats.json"
+LEARNED_PATH   = DATA_DIR / "learned_formats.json"
 
 def load_config() -> dict:
     if CONFIG_PATH.exists():
@@ -365,6 +366,25 @@ Reglas:
 Mensaje:
 {text}"""
 
+def _load_learned_formats() -> list:
+    try:
+        if LEARNED_PATH.exists():
+            return json.loads(LEARNED_PATH.read_text())
+    except Exception:
+        pass
+    return []
+
+def _build_ai_prompt(text: str) -> str:
+    learned = _load_learned_formats()
+    examples = ""
+    if learned:
+        examples = "\n\nEjemplos de formatos ya reconocidos (úsalos como referencia):\n"
+        for f in learned[-8:]:  # últimos 8 ejemplos
+            s = f.get("signal", {})
+            examples += f'Mensaje: """{f["text"][:200]}"""\n'
+            examples += f'Resultado: {json.dumps(s, ensure_ascii=False)}\n\n'
+    return _AI_PROMPT.format(text=text) + examples
+
 async def _parse_with_ai(text: str) -> Optional[Signal]:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
@@ -381,7 +401,7 @@ async def _parse_with_ai(text: str) -> Optional[Signal]:
                 json={
                     "model": "claude-haiku-4-5-20251001",
                     "max_tokens": 128,
-                    "messages": [{"role": "user", "content": _AI_PROMPT.format(text=text)}],
+                    "messages": [{"role": "user", "content": _build_ai_prompt(text)}],
                 },
             )
         if r.status_code != 200:
@@ -445,47 +465,36 @@ async def suggest_parser(body: dict, secret: str = Query(...)):
     text = body.get("text", "")
     if not text:
         return {"ok": False, "reason": "Texto vacío"}
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
+    if not os.environ.get("ANTHROPIC_API_KEY"):
         return {"ok": False, "reason": "Falta ANTHROPIC_API_KEY en Railway"}
+    signal = await _parse_with_ai(text)
+    if signal is None:
+        return {"ok": False, "reason": "Claude no pudo interpretar este mensaje como señal de trading"}
+    return {"ok": True, "signal": {
+        "type":      signal.type.value,
+        "symbol":    signal.symbol_raw,
+        "direction": signal.direction,
+        "entry":     signal.price,
+        "sl":        signal.sl,
+        "tp":        signal.tp,
+    }, "text": text}
 
-    prompt = f"""Eres un experto en parsing de señales de trading de Telegram.
-
-Analiza este mensaje de señal y genera una función Python llamada `_parse_custom_NOMBRE(text, m)`
-que lo parsee correctamente. Usa el mismo patrón que estas funciones existentes:
-- Retorna un objeto Signal(type, trader, symbol_raw, direction, lots, price, sl, tp, format, raw_text)
-- SignalType.OPEN para abrir, SignalType.CLOSE para cerrar
-- direction: "BUY" o "SELL"
-- price=0.0 si es mercado
-- sl y tp son float o None
-
-También genera el bloque `if` para agregarlo en la función `parse_message()`.
-
-Mensaje a parsear:
-\"\"\"
-{text}
-\"\"\"
-
-Responde SOLO con el código Python, sin explicaciones adicionales."""
-
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 1024,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
-    if resp.status_code != 200:
-        return {"ok": False, "reason": f"API error {resp.status_code}"}
-    code = resp.json()["content"][0]["text"].strip()
-    return {"ok": True, "code": code}
+@app.post("/debug/learn-format")
+async def learn_format(body: dict, secret: str = Query(...)):
+    check_secret(secret)
+    text   = body.get("text", "")
+    signal = body.get("signal", {})
+    if not text or not signal:
+        return {"ok": False, "reason": "Faltan datos"}
+    learned = _load_learned_formats()
+    learned.append({
+        "text":   text,
+        "signal": signal,
+        "added":  datetime.utcnow().strftime("%d/%m/%Y %H:%M"),
+    })
+    LEARNED_PATH.write_text(json.dumps(learned, ensure_ascii=False, indent=2))
+    _add_log(f"✅ Formato aprendido: {signal.get('symbol','?')} {signal.get('direction','?')}")
+    return {"ok": True, "total": len(learned)}
 
 # -------------------------------------------------------------------
 # Confirmación via Telegram bot
