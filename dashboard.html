@@ -719,22 +719,38 @@ async function testParse() {
     if (data.parsed) {
       res.className = 'parse-result ok';
       const sig = data.signal;
-      res.textContent = '✓ Señal reconocida\n\n'
-        + `Formato:   ${sig.format}\n`
-        + `Tipo:      ${sig.type}\n`
-        + `Símbolo:   ${sig.symbol}\n`
-        + `Dirección: ${sig.direction || '—'}\n`
-        + `Precio:    ${sig.price ?? '—'}\n`
-        + `SL:        ${sig.sl ?? '—'}\n`
-        + `TP:        ${sig.tp ?? '—'}\n`
-        + `Lotes:     ${sig.lots ?? '—'}`;
+      const FORMAT_NAMES = {
+        'now_signal':        'Mercado directo (SÍMBOLO COMPRAR/BUY)',
+        'entrada_signal':    'Entrada con rango (BUY SÍMBOLO + Entrada:)',
+        'dir_symbol_price':  'Dirección + Símbolo + Precio',
+        'trade_signal':      'Trade clásico (BUY TRADE + ENTRY:)',
+        'at_signal':         'Precio con @ (SÍMBOLO BUY @ precio)',
+        'long_short':        'LONG/SHORT en (SÍMBOLO Activo)',
+        'lumy':              'LumyArena',
+        'ai':                'IA (Claude)',
+      };
+      const TIPO_ES = { 'open': 'Apertura', 'close': 'Cierre', 'unknown': 'Desconocido' };
+      const dirColor = sig.direction === 'BUY' ? '#3fb950' : '#f85149';
+      res.style.cssText = '';
+      res.innerHTML = `<span style="color:#3fb950;font-weight:600">✓ Señal reconocida</span>
+<span style="color:#8b949e;font-size:11px"> — ${FORMAT_NAMES[sig.format] || sig.format}</span>
+
+<table style="border-collapse:collapse;margin-top:8px;width:100%">
+  <tr><td style="color:#8b949e;padding:1px 16px 1px 0">Tipo</td><td>${TIPO_ES[sig.type] || sig.type}</td></tr>
+  <tr><td style="color:#8b949e;padding:1px 16px 1px 0">Símbolo</td><td style="font-weight:600">${sig.symbol}</td></tr>
+  <tr><td style="color:#8b949e;padding:1px 16px 1px 0">Dirección</td><td style="color:${dirColor};font-weight:600">${sig.direction === 'BUY' ? 'COMPRA (BUY)' : 'VENTA (SELL)'}</td></tr>
+  <tr><td style="color:#8b949e;padding:1px 16px 1px 0">Precio entrada</td><td>${sig.price > 0 ? sig.price : 'Precio de mercado'}</td></tr>
+  <tr><td style="color:#8b949e;padding:1px 16px 1px 0">Stop Loss</td><td style="color:#f85149">${sig.sl ?? '—'}</td></tr>
+  <tr><td style="color:#8b949e;padding:1px 16px 1px 0">Take Profit</td><td style="color:#3fb950">${sig.tp ?? '—'}</td></tr>
+</table>`;
     } else {
       res.className = 'parse-result err';
       res.textContent = '✗ No reconocido\n\nMotivo: ' + data.reason
         + '\n\nFormatos soportados:\n'
-        + '  US30 BUY NOW\n'
+        + '  XAUUSD COMPRAR / US30 BUY NOW\n'
         + '  SELL XAUUSD 4138 / SL 4160 / TP NINGUNO\n'
         + '  BUY TRADE XAUUSD / ENTRY: 3320 / SL: 3300\n'
+        + '  LONG en (XAUUSD Activo)\n'
         + '  Trader acaba de abrir una posición';
     }
   } catch(e) {
