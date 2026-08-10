@@ -528,10 +528,47 @@ async function suggestParser() {
       body: JSON.stringify({text}),
     });
     if (!data.ok) {
-      res.style.background = '#2d1117';
-      res.style.borderColor = '#6e2e2e';
-      res.style.color = '#f85149';
-      res.textContent = '❌ ' + data.reason;
+      // Mostrar formulario manual para completar los datos faltantes
+      _lastSuggestedText = text;
+      res.style.cssText = 'display:block;background:#1a1200;border:1px solid #d29922;color:#e6edf3;border-radius:6px;padding:12px 14px;font-family:SF Mono,Consolas,monospace;font-size:12px;line-height:1.7;margin-top:14px';
+      res.innerHTML = `
+        <div style="color:#d29922;font-weight:600;margin-bottom:10px">⚠️ Claude no detectó el símbolo o dirección — completa los datos:</div>
+        <table style="border-collapse:collapse;width:100%;margin-bottom:10px">
+          <tr>
+            <td style="color:#8b949e;padding:4px 12px 4px 0;white-space:nowrap">Tipo</td>
+            <td><select id="man-type" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 6px;font-size:12px">
+              <option value="open">🟢 Apertura</option>
+              <option value="close">🔴 Cierre</option>
+            </select></td>
+          </tr>
+          <tr>
+            <td style="color:#8b949e;padding:4px 12px 4px 0">Símbolo</td>
+            <td><input id="man-symbol" placeholder="ej: XAUUSD" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 8px;font-size:12px;width:130px"></td>
+          </tr>
+          <tr>
+            <td style="color:#8b949e;padding:4px 12px 4px 0">Dirección</td>
+            <td><select id="man-dir" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 6px;font-size:12px">
+              <option value="BUY">BUY</option>
+              <option value="SELL">SELL</option>
+            </select></td>
+          </tr>
+          <tr>
+            <td style="color:#8b949e;padding:4px 12px 4px 0">Precio entrada</td>
+            <td><input id="man-entry" placeholder="0 = mercado" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 8px;font-size:12px;width:130px"></td>
+          </tr>
+          <tr>
+            <td style="color:#8b949e;padding:4px 12px 4px 0">SL</td>
+            <td><input id="man-sl" placeholder="opcional" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 8px;font-size:12px;width:130px"></td>
+          </tr>
+          <tr>
+            <td style="color:#8b949e;padding:4px 12px 4px 0">TP</td>
+            <td><input id="man-tp" placeholder="opcional" style="background:#0d1117;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 8px;font-size:12px;width:130px"></td>
+          </tr>
+        </table>
+        <div style="display:flex;gap:8px">
+          <button onclick="confirmLearnManual()" style="background:#0d2818;border:1px solid #238636;color:#3fb950;border-radius:6px;padding:5px 18px;cursor:pointer;font-size:13px">✅ Guardar formato</button>
+          <button onclick="document.getElementById('result-test').style.display='none'" style="background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:6px;padding:5px 18px;cursor:pointer;font-size:13px">❌ Cancelar</button>
+        </div>`;
       return;
     }
     _lastSuggestedText   = data.text;
@@ -563,6 +600,22 @@ async function suggestParser() {
     res.style.color = '#f85149';
     res.textContent = '❌ Error: ' + e.message;
   }
+}
+
+async function confirmLearnManual() {
+  const res = document.getElementById('result-test');
+  const symbol = document.getElementById('man-symbol')?.value.trim().toUpperCase();
+  const direction = document.getElementById('man-dir')?.value;
+  const type = document.getElementById('man-type')?.value;
+  if (!symbol) { alert('Ingresa el símbolo (ej: XAUUSD)'); return; }
+  const signal = {
+    type, symbol, direction,
+    entry: parseFloat(document.getElementById('man-entry')?.value) || 0,
+    sl:    parseFloat(document.getElementById('man-sl')?.value)    || null,
+    tp:    parseFloat(document.getElementById('man-tp')?.value)    || null,
+  };
+  _lastSuggestedSignal = signal;
+  await confirmLearnFormat();
 }
 
 async function confirmLearnFormat() {
