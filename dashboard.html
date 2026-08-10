@@ -731,7 +731,7 @@ async function testParse() {
       };
       const TIPO_ES = { 'open': 'Apertura', 'close': 'Cierre', 'unknown': 'Desconocido' };
       const dirColor = sig.direction === 'BUY' ? '#3fb950' : '#f85149';
-      res.style.cssText = '';
+      res.style.display = 'block';
       res.innerHTML = `<span style="color:#3fb950;font-weight:600">✓ Señal reconocida</span>
 <span style="color:#8b949e;font-size:11px"> — ${FORMAT_NAMES[sig.format] || sig.format}</span>
 
