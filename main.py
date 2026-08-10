@@ -357,7 +357,7 @@ null
 
 Reglas:
 - Palabras de cierre: CIERREN, CIERRE, CERRAR, CLOSE, CLOSED, TP HIT, SL HIT, +X PIPS CIERREN, salir
-- Palabras de apertura: BUY, SELL, ENTRY, ABRIR, NOW, nueva entrada
+- Palabras de apertura: BUY, SELL, ENTRY, ABRIR, NOW, nueva entrada, COMPRAR, COMPRA, VENDER, VENTA
 - symbol: sin barras (XAUUSD no XAU/USD), en mayúsculas
 - tp/sl: null si dice NINGUNO, NONE, NO TP, NO SL o no menciona
 - Si el mensaje menciona un trade previo Y luego dice CIERREN → es CIERRE de ese trade
@@ -467,7 +467,7 @@ Analiza este mensaje e intenta extraer una señal de trading. Sé inteligente:
 - 📍 o 🎯 suelen indicar el precio de entrada
 - ✅ o 💰 suelen indicar Take Profit
 - 🔴 o 🚫 suelen indicar Stop Loss
-- LONG = BUY, SHORT = SELL
+- LONG = BUY, SHORT = SELL, COMPRAR/COMPRA = BUY, VENDER/VENTA = SELL
 
 Responde SOLO con JSON válido, sin explicaciones. Campos:
 - type: "open" o "close"

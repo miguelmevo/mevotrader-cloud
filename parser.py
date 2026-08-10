@@ -54,7 +54,8 @@ def parse_message(text: str) -> Optional[Signal]:
         return _parse_trade_signal(text, m)
 
     # --- Formato SYMBOL BUY/SELL NOW  (ej: "US30 BUY NOW") ---
-    m = re.search(r'\b([\w./]{2,10})\s+(BUY|SELL)\s+NOW\b', text, re.IGNORECASE)
+    # También acepta COMPRAR/VENDER en español
+    m = re.search(r'\b([\w./]{2,10})\s+(BUY|SELL|COMPRAR|VENDER|COMPRA|VENTA)(?:\s+NOW)?\b', text, re.IGNORECASE)
     if m:
         return _parse_now_signal(text, m)
 
@@ -217,16 +218,24 @@ def _parse_at_signal(text: str, m) -> Optional[Signal]:
 # Formato SYMBOL BUY/SELL NOW  (ImperiumFX, etc.)
 # ──────────────────────────────────────────
 
+_DIR_MAP = {"COMPRAR": "BUY", "COMPRA": "BUY", "VENDER": "SELL", "VENTA": "SELL",
+            "LONG": "BUY", "SHORT": "SELL"}
+
 def _parse_now_signal(text: str, m) -> Optional[Signal]:
     symbol    = normalize_symbol(m.group(1))
-    direction = m.group(2).upper()
-    sl = _find_price(text, r'SL\s*[:\s]\s*([\d.]+)')
-    tp_m = re.search(r'TP\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
+    direction = _DIR_MAP.get(m.group(2).upper(), m.group(2).upper())
+    # SL: acepta "SL:", "Stop Loss:", "Stop loss:"
+    sl = _find_price(text, r'(?:S/?L|Stop\s*Loss)\s*[:\s]\s*([\d.]+)')
+    # TP: acepta "TP:", "TP1:", "Take profit 1:", etc.
+    tp_m = re.search(r'(?:T/?P\d*|Take\s*[Pp]rofit\s*\d*)\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
     tp = float(tp_m.group(1)) if tp_m else None
+    # Precio de entrada desde rango "📍 4356.81-4337.08" o "Entrada: 4356"
+    entry_m = re.search(r'(?:📍|🎯|Entrada\s*[:\s])\s*([\d.]+)', text)
+    price = float(entry_m.group(1)) if entry_m else 0.0
     return Signal(
         type=SignalType.OPEN, trader=_guess_trader(text),
         symbol_raw=symbol, direction=direction,
-        lots=0.0, price=0.0,
+        lots=0.0, price=price,
         sl=sl, tp=tp,
         format="now_signal", raw_text=text,
     )
@@ -276,7 +285,7 @@ def _parse_dir_symbol_price(text: str, m) -> Optional[Signal]:
 # ──────────────────────────────────────────
 
 def _parse_long_short(text: str, m) -> Optional[Signal]:
-    direction = "BUY" if m.group(1).upper() == "LONG" else "SELL"
+    direction = _DIR_MAP.get(m.group(1).upper(), m.group(1).upper())
     symbol    = normalize_symbol(m.group(2))
     sl = _find_price(text, r'\bS/?L\s*[:\s]\s*([\d.]+)')
     tp_m = re.search(r'\bTP1?\s*[:\s]\s*([\d.]+)', text, re.IGNORECASE)
