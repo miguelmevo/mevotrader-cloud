@@ -226,6 +226,44 @@ async def ack_signal(signal_id: str, secret: str = Query(...)):
         pending_for_ea = None
     return {"ok": True}
 
+@app.post("/signal/result")
+async def signal_result(body: dict, secret: str = Query(...)):
+    check_secret(secret)
+    signal_id = body.get("id", "")
+    executed  = body.get("executed", False)
+    detail    = body.get("detail", "")
+    ticket    = body.get("ticket", "")
+    price     = body.get("price", "")
+
+    # Actualizar estado en historial en memoria
+    for s in signal_history:
+        if s.get("id") == signal_id:
+            s["status"] = "ejecutada" if executed else "no ejecutada"
+            if detail: s["mt5_detail"] = detail
+            if ticket: s["mt5_ticket"] = str(ticket)
+            break
+
+    # Actualizar en channel_stats y persistir
+    for ch_data in channel_stats.values():
+        for s in ch_data.get("history", []):
+            if s.get("id") == signal_id:
+                s["status"] = "ejecutada" if executed else "no ejecutada"
+                if detail: s["mt5_detail"] = detail
+                if ticket: s["mt5_ticket"] = str(ticket)
+                break
+    _save_channel_stats()
+
+    # Notificar por Telegram
+    if executed:
+        msg = f"✅ *Señal ejecutada en MT5*\nTicket: `{ticket}` | Precio real: `{price}`"
+    else:
+        msg = f"⚠️ *Señal NO ejecutada*\nMotivo: {detail}"
+    _add_log(("✅ Ejecutada" if executed else "⚠️ No ejecutada") + f" — {signal_id} {detail}")
+    if _bot_ref:
+        await _alert(msg)
+
+    return {"ok": True}
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

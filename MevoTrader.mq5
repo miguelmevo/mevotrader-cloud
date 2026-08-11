@@ -4,7 +4,7 @@
 //|  Requiere: Tools → Options → Expert Advisors → Allow WebRequest  |
 //+------------------------------------------------------------------+
 #property copyright "MevoTrader"
-#property version   "1.15"
+#property version   "1.16"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -189,30 +189,36 @@ void CheckPendingSignal()
    double tick_size = SymbolInfoDouble(Pending.symbol, SYMBOL_TRADE_TICK_SIZE);
    double price_now = (Pending.direction == "BUY") ? tick.ask : tick.bid;
 
+   string sig_id = Pending.id;
+
    if(Pending.pe_low > 0) {
-      // Rango de entrada definido — verificar que el precio esté dentro
       double range_hi = MathMax(Pending.pe, Pending.pe_low);
       double range_lo = MathMin(Pending.pe, Pending.pe_low);
       if(price_now < range_lo || price_now > range_hi) {
-         Print("Señal cancelada — precio ", price_now, " fuera del rango [", range_lo, "-", range_hi, "]");
+         string reason = "Precio " + DoubleToString(price_now,5) + " fuera del rango ["
+                         + DoubleToString(range_lo,5) + " - " + DoubleToString(range_hi,5) + "]";
+         Print("Señal cancelada — ", reason);
          Pending.active = false;
+         ReportResult(sig_id, false, reason);
          return;
       }
    } else if(Pending.pe > 0) {
       double deviation = MathAbs(price_now - Pending.pe) / tick_size;
       if(deviation > MaxDeviationTicks) {
-         Print("Señal cancelada — desviación ", DoubleToString(deviation,1), " ticks");
+         string reason = "Desviación " + DoubleToString(deviation,1) + " ticks (máx " + IntegerToString(MaxDeviationTicks) + ")";
+         Print("Señal cancelada — ", reason);
          Pending.active = false;
+         ReportResult(sig_id, false, reason);
          return;
       }
    }
 
-   ExecuteTrade(Pending.symbol, Pending.direction, Pending.sl, Pending.tp, Pending.channel_id);
+   ExecuteTrade(Pending.symbol, Pending.direction, Pending.sl, Pending.tp, Pending.channel_id, sig_id);
    Pending.active = false;
 }
 
 //+------------------------------------------------------------------+
-void ExecuteTrade(string symbol, string direction, double sl_price, double tp_price, string channel_id)
+void ExecuteTrade(string symbol, string direction, double sl_price, double tp_price, string channel_id, string signal_id="")
 {
    MqlTick tick;
    if(!SymbolInfoTick(symbol, tick)) return;
@@ -257,8 +263,16 @@ void ExecuteTrade(string symbol, string direction, double sl_price, double tp_pr
       ? Trade.Buy(lots,  symbol, price, sl_price, tp_price, comment)
       : Trade.Sell(lots, symbol, price, sl_price, tp_price, comment);
 
-   if(!ok) Print("ERROR: ", Trade.ResultRetcodeDescription());
-   else    Print("OK — Ticket: ", Trade.ResultOrder());
+   if(!ok) {
+      string err = Trade.ResultRetcodeDescription();
+      Print("ERROR: ", err);
+      if(signal_id != "") ReportResult(signal_id, false, "Error MT5: " + err);
+   } else {
+      ulong ticket = Trade.ResultOrder();
+      double exec_price = Trade.ResultPrice();
+      Print("OK — Ticket: ", ticket);
+      if(signal_id != "") ReportResult(signal_id, true, "OK", ticket, exec_price);
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -332,6 +346,24 @@ int GetDefaultSL(string base_symbol) {
    }
    int ticks = (int)StringToInteger(val);
    return (ticks > 0) ? ticks : DefaultSL_Ticks;
+}
+
+void ReportResult(string signal_id, bool executed, string detail, ulong ticket=0, double exec_price=0)
+{
+   string url = CloudURL + "/signal/result?secret=" + EA_Secret;
+   string body_str = "{"
+      + "\"id\":\"" + signal_id + "\","
+      + "\"executed\":" + (executed ? "true" : "false") + ","
+      + "\"detail\":\"" + detail + "\","
+      + "\"ticket\":\"" + (ticket > 0 ? IntegerToString(ticket) : "") + "\","
+      + "\"price\":\"" + (exec_price > 0 ? DoubleToString(exec_price, 5) : "") + "\""
+      + "}";
+   char post[];
+   int len = StringToCharArray(body_str, post, 0, StringLen(body_str));
+   ArrayResize(post, len - 1);
+   char result[];
+   string result_headers;
+   WebRequest("POST", url, "Content-Type: application/json\r\n", 5000, post, result, result_headers);
 }
 
 string ChShort(string ch) {
