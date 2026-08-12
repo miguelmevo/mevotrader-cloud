@@ -4,7 +4,7 @@
 //|  Requiere: Tools → Options → Expert Advisors → Allow WebRequest  |
 //+------------------------------------------------------------------+
 #property copyright "MevoTrader"
-#property version   "1.11"
+#property version   "1.16"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -29,7 +29,8 @@ input ENUM_LOT_MODE LotMode    = LOT_FIXED;
 input double        LotValue   = 0.10;   // Lotes si FIJO, % balance si PORCENTAJE
 
 input group "═══ SL / TP ═══"
-input int    DefaultSL_Ticks   = 50;     // SL en ticks si señal no trae SL
+input int    DefaultSL_Ticks   = 50;     // SL en ticks si señal no trae SL (fallback global)
+input string DefaultSL_Map     = "XAUUSD:500,DJ30ft:700,EURUSD:300,GBPUSD:300"; // SL por instrumento (sin sufijo)
 input double RR                = 2.0;    // Risk:Reward para calcular TP
 
 input group "═══ OFFSET Y FILTROS ═══"
@@ -52,6 +53,8 @@ struct PendingSignal {
    double   sl;
    double   tp;
    double   pe;
+   double   pe_low;       // límite inferior del rango de entrada (0 = sin rango)
+   string   channel_id;   // ID del canal origen — usado para comment y cierre selectivo
    datetime received_at;
    bool     active;
 };
@@ -119,13 +122,15 @@ void PollServer()
    string body = CharArrayToString(result);
    if(body == "" || body == "null" || StringFind(body, "action") < 0) return;
 
-   string action    = ExtractJSON(body, "action");
-   string signal_id = ExtractJSON(body, "id");
-   string symbol    = ExtractJSON(body, "symbol");
-   string direction = ExtractJSON(body, "direction");
-   double sl        = StringToDouble(ExtractJSON(body, "sl"));
-   double tp        = StringToDouble(ExtractJSON(body, "tp"));
-   double pe        = StringToDouble(ExtractJSON(body, "pe"));
+   string action     = ExtractJSON(body, "action");
+   string signal_id  = ExtractJSON(body, "id");
+   string symbol     = ExtractJSON(body, "symbol");
+   string direction  = ExtractJSON(body, "direction");
+   double sl         = StringToDouble(ExtractJSON(body, "sl"));
+   double tp         = StringToDouble(ExtractJSON(body, "tp"));
+   double pe         = StringToDouble(ExtractJSON(body, "pe"));
+   string channel_id = ExtractJSON(body, "channel_id");
+   double pe_low     = StringToDouble(ExtractJSON(body, "pe_low"));
 
    // Quitar sufijo de punto del mensaje (ej: XAUUSD.a → XAUUSD) y homologar
    int dot = StringFind(symbol, ".");
@@ -144,7 +149,7 @@ void PollServer()
    Print("Señal [", signal_id, "]: ", action, " ", broker_symbol, " ", direction);
 
    if(action == "close") {
-      ClosePositions(broker_symbol);
+      ClosePositions(broker_symbol, channel_id);
       AckSignal(signal_id);
       return;
    }
@@ -153,7 +158,8 @@ void PollServer()
       if(Pending.active && Pending.id == signal_id) return;
       Pending.id = signal_id; Pending.symbol = broker_symbol;
       Pending.direction = direction; Pending.sl = sl;
-      Pending.tp = tp; Pending.pe = pe;
+      Pending.tp = tp; Pending.pe = pe; Pending.pe_low = pe_low;
+      Pending.channel_id = channel_id;
       Pending.received_at = TimeCurrent();
       Pending.active = true;
       AckSignal(signal_id);
@@ -183,21 +189,36 @@ void CheckPendingSignal()
    double tick_size = SymbolInfoDouble(Pending.symbol, SYMBOL_TRADE_TICK_SIZE);
    double price_now = (Pending.direction == "BUY") ? tick.ask : tick.bid;
 
-   if(Pending.pe > 0) {
+   string sig_id = Pending.id;
+
+   if(Pending.pe_low > 0) {
+      double range_hi = MathMax(Pending.pe, Pending.pe_low);
+      double range_lo = MathMin(Pending.pe, Pending.pe_low);
+      if(price_now < range_lo || price_now > range_hi) {
+         string reason = "Precio " + DoubleToString(price_now,5) + " fuera del rango ["
+                         + DoubleToString(range_lo,5) + " - " + DoubleToString(range_hi,5) + "]";
+         Print("Señal cancelada — ", reason);
+         Pending.active = false;
+         ReportResult(sig_id, false, reason);
+         return;
+      }
+   } else if(Pending.pe > 0) {
       double deviation = MathAbs(price_now - Pending.pe) / tick_size;
       if(deviation > MaxDeviationTicks) {
-         Print("Señal cancelada — desviación ", DoubleToString(deviation,1), " ticks");
+         string reason = "Desviación " + DoubleToString(deviation,1) + " ticks (máx " + IntegerToString(MaxDeviationTicks) + ")";
+         Print("Señal cancelada — ", reason);
          Pending.active = false;
+         ReportResult(sig_id, false, reason);
          return;
       }
    }
 
-   ExecuteTrade(Pending.symbol, Pending.direction, Pending.sl, Pending.tp);
+   ExecuteTrade(Pending.symbol, Pending.direction, Pending.sl, Pending.tp, Pending.channel_id, sig_id);
    Pending.active = false;
 }
 
 //+------------------------------------------------------------------+
-void ExecuteTrade(string symbol, string direction, double sl_price, double tp_price)
+void ExecuteTrade(string symbol, string direction, double sl_price, double tp_price, string channel_id, string signal_id="")
 {
    MqlTick tick;
    if(!SymbolInfoTick(symbol, tick)) return;
@@ -211,10 +232,18 @@ void ExecuteTrade(string symbol, string direction, double sl_price, double tp_pr
       : tick.bid - OffsetTicks * tick_size;
    price = NormalizeDouble(price, digits);
 
-   if(sl_price <= 0)
+   if(sl_price <= 0) {
+      // Quitar sufijo del broker para buscar en el mapa
+      string base = symbol;
+      if(SymbolSuffix != "") {
+         int suf_pos = StringFind(symbol, SymbolSuffix);
+         if(suf_pos > 0) base = StringSubstr(symbol, 0, suf_pos);
+      }
+      int sl_ticks = GetDefaultSL(base);
       sl_price = is_buy
-         ? price - DefaultSL_Ticks * tick_size
-         : price + DefaultSL_Ticks * tick_size;
+         ? price - sl_ticks * tick_size
+         : price + sl_ticks * tick_size;
+   }
    sl_price = NormalizeDouble(sl_price, digits);
 
    if(tp_price <= 0) {
@@ -229,12 +258,21 @@ void ExecuteTrade(string symbol, string direction, double sl_price, double tp_pr
    Print("Ejecutando ", direction, " ", symbol, " Lots=", lots,
          " Precio=", price, " SL=", sl_price, " TP=", tp_price);
 
+   string comment = (channel_id != "") ? "MEVO_" + ChShort(channel_id) : "MevoTrader";
    bool ok = is_buy
-      ? Trade.Buy(lots,  symbol, price, sl_price, tp_price, "MevoTrader")
-      : Trade.Sell(lots, symbol, price, sl_price, tp_price, "MevoTrader");
+      ? Trade.Buy(lots,  symbol, price, sl_price, tp_price, comment)
+      : Trade.Sell(lots, symbol, price, sl_price, tp_price, comment);
 
-   if(!ok) Print("ERROR: ", Trade.ResultRetcodeDescription());
-   else    Print("OK — Ticket: ", Trade.ResultOrder());
+   if(!ok) {
+      string err = Trade.ResultRetcodeDescription();
+      Print("ERROR: ", err);
+      if(signal_id != "") ReportResult(signal_id, false, "Error MT5: " + err);
+   } else {
+      ulong ticket = Trade.ResultOrder();
+      double exec_price = Trade.ResultPrice();
+      Print("OK — Ticket: ", ticket);
+      if(signal_id != "") ReportResult(signal_id, true, "OK", ticket, exec_price);
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -292,16 +330,60 @@ void CheckBreakEven()
 }
 
 //+------------------------------------------------------------------+
-void ClosePositions(string symbol)
+// Devuelve el SL en ticks para el símbolo dado (sin sufijo), buscando en DefaultSL_Map
+// Si no encuentra, retorna DefaultSL_Ticks global
+int GetDefaultSL(string base_symbol) {
+   string map = DefaultSL_Map + ",";
+   string search = base_symbol + ":";
+   int pos = StringFind(map, search);
+   if(pos < 0) return DefaultSL_Ticks;
+   pos += StringLen(search);
+   string val = "";
+   for(int i = pos; i < StringLen(map); i++) {
+      ushort c = StringGetCharacter(map, i);
+      if(c == ',' || c == '}') break;
+      val += ShortToString(c);
+   }
+   int ticks = (int)StringToInteger(val);
+   return (ticks > 0) ? ticks : DefaultSL_Ticks;
+}
+
+void ReportResult(string signal_id, bool executed, string detail, ulong ticket=0, double exec_price=0)
 {
+   string url = CloudURL + "/signal/result?secret=" + EA_Secret;
+   string body_str = "{"
+      + "\"id\":\"" + signal_id + "\","
+      + "\"executed\":" + (executed ? "true" : "false") + ","
+      + "\"detail\":\"" + detail + "\","
+      + "\"ticket\":\"" + (ticket > 0 ? IntegerToString(ticket) : "") + "\","
+      + "\"price\":\"" + (exec_price > 0 ? DoubleToString(exec_price, 5) : "") + "\""
+      + "}";
+   char post[];
+   int len = StringToCharArray(body_str, post, 0, StringLen(body_str));
+   ArrayResize(post, len - 1);
+   char result[];
+   string result_headers;
+   WebRequest("POST", url, "Content-Type: application/json\r\n", 5000, post, result, result_headers);
+}
+
+string ChShort(string ch) {
+   int len = StringLen(ch);
+   return (len > 5) ? StringSubstr(ch, len - 5) : ch;
+}
+
+void ClosePositions(string symbol, string channel_id)
+{
+   string target = (channel_id != "") ? "MEVO_" + ChShort(channel_id) : "";
    int closed = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--) {
       if(!PosInfo.SelectByIndex(i)) continue;
       if(PosInfo.Magic() != MagicNumber) continue;
       if(PosInfo.Symbol() != symbol) continue;
+      if(target != "" && StringFind(PosInfo.Comment(), target) < 0) continue;
       if(Trade.PositionClose(PosInfo.Ticket())) closed++;
    }
-   Print("Cerradas ", closed, " posiciones de ", symbol);
+   Print("Cerradas ", closed, " posiciones de ", symbol,
+         (target != "") ? " canal=" + target : " (todas)");
 }
 
 bool IsSymbolAllowed(string symbol)
