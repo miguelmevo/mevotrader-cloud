@@ -34,6 +34,7 @@ CONFIG_PATH = Path(__file__).parent / "config.json"
 DASHBOARD_PATH = Path(__file__).parent / "dashboard.html"
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
 CHANNELS_PATH  = DATA_DIR / "channels.json"
+ORDER_PATH     = DATA_DIR / "channel_order.json"
 LOG_PATH       = DATA_DIR / "activity_log.json"
 STATS_PATH     = DATA_DIR / "channel_stats.json"
 LEARNED_PATH   = DATA_DIR / "learned_formats.json"
@@ -99,6 +100,7 @@ confirm_required: bool            = False  # True = pedir confirmación, False =
 
 # Canales dinámicos: {id: {"id": int, "name": str, "source": "env"|"dynamic"}}
 extra_channels: dict[int, dict]   = {}
+channel_order:  list              = []
 
 def _load_extra_channels():
     if CHANNELS_PATH.exists():
@@ -115,6 +117,21 @@ def _save_extra_channels():
         CHANNELS_PATH.write_text(json.dumps(extra_channels))
     except Exception as e:
         log.warning("No se pudo guardar channels.json: %s", e)
+
+def _load_channel_order() -> list:
+    if ORDER_PATH.exists():
+        try:
+            return json.loads(ORDER_PATH.read_text())
+        except Exception:
+            pass
+    return []
+
+def _save_channel_order():
+    try:
+        ORDER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ORDER_PATH.write_text(json.dumps(channel_order))
+    except Exception as e:
+        log.warning("No se pudo guardar channel_order.json: %s", e)
 
 def _load_activity_log() -> list:
     if LOG_PATH.exists():
@@ -164,6 +181,7 @@ def _rebuild_from_channel_stats():
 
 cfg = load_config()
 extra_channels = _load_extra_channels()
+channel_order  = _load_channel_order()
 for entry in _load_activity_log():
     activity_log.append(entry)
 channel_stats.update(_load_channel_stats())
@@ -305,6 +323,8 @@ async def api_channels(secret: str = Query(...)):
         ch_copy = dict(ch)
         ch_copy["stats"] = channel_stats.get(abs(ch["id"]), empty_stats())
         result.append(ch_copy)
+    order_map = {cid: i for i, cid in enumerate(channel_order)}
+    result.sort(key=lambda c: order_map.get(c["id"], len(channel_order)))
     return {"channels": result}
 
 @app.post("/api/channels")
@@ -315,6 +335,9 @@ async def api_add_channel(body: dict, secret: str = Query(...)):
     if not ch_id:
         raise HTTPException(status_code=400, detail="id requerido")
     extra_channels[ch_id] = {"id": ch_id, "name": ch_name, "source": "dynamic", "active": True}
+    if ch_id not in channel_order:
+        channel_order.append(ch_id)
+        _save_channel_order()
     _save_extra_channels()
     if _telethon_client:
         _telethon_client.add_event_handler(
@@ -323,6 +346,14 @@ async def api_add_channel(body: dict, secret: str = Query(...)):
         )
     _add_log(f"Instrumento agregado: {ch_name} ({ch_id})")
     log.info("Instrumento agregado: %s (%s)", ch_name, ch_id)
+    return {"ok": True}
+
+@app.post("/api/channels/reorder")
+async def api_reorder_channels(body: dict, secret: str = Query(...)):
+    global channel_order
+    check_secret(secret)
+    channel_order = [int(x) for x in body.get("order", [])]
+    _save_channel_order()
     return {"ok": True}
 
 @app.patch("/api/channels/{channel_id}")
@@ -342,6 +373,9 @@ async def api_rename_channel(channel_id: int, body: dict, secret: str = Query(..
 async def api_remove_channel(channel_id: int, secret: str = Query(...)):
     check_secret(secret)
     extra_channels.pop(channel_id, None)
+    if channel_id in channel_order:
+        channel_order.remove(channel_id)
+        _save_channel_order()
     _save_extra_channels()
     _add_log(f"Instrumento eliminado: {channel_id}")
     return {"ok": True}

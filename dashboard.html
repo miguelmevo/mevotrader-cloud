@@ -414,9 +414,12 @@ async function loadChannels() {
           }).join('');
 
       return `
-      <li class="channel-item" style="display:block;padding:0;border-bottom:1px solid #21262d">
+      <li id="ch-row-${ch.id}" class="channel-item" style="display:block;padding:0;border-bottom:1px solid #21262d">
         <div onclick="toggleChannelHistory('hist-${ch.id}')"
              style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer;gap:6px">
+          <span onmousedown="_dndStart(event,${ch.id})" ontouchstart="_dndStart(event,${ch.id})"
+            style="cursor:grab;color:#484f58;font-size:16px;padding:0 4px 0 0;user-select:none;flex-shrink:0;touch-action:none;line-height:1"
+            title="Arrastrar para reordenar">⠿</span>
           <div style="min-width:0;flex:1;overflow:hidden">
             <div style="display:flex;align-items:center;gap:4px">
               <span class="channel-name" style="${mob ? 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px' : ''}">${mobName}</span>
@@ -513,6 +516,87 @@ async function removeChannel(id) {
     await api('/api/channels/' + id, {method:'DELETE'});
     loadChannels();
   } catch(e) { alert('Error: ' + e.message); }
+}
+
+// ── Drag & Drop reorder ──────────────────────────────────────────
+let _dnd = {on:false, id:null, ghost:null, overRow:null, offY:0};
+
+function _dndStart(e, id) {
+  e.preventDefault();
+  e.stopPropagation();
+  const row  = document.getElementById('ch-row-' + id);
+  const rect = row.getBoundingClientRect();
+  const cy   = e.touches ? e.touches[0].clientY : e.clientY;
+
+  const ghost = row.cloneNode(true);
+  ghost.removeAttribute('id');
+  ghost.style.cssText += ';position:fixed;left:' + rect.left + 'px;top:' + rect.top + 'px'
+    + ';width:' + rect.width + 'px;z-index:999;opacity:0.9;pointer-events:none'
+    + ';border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.6);background:#161b22';
+  document.body.appendChild(ghost);
+
+  row.style.opacity = '0.3';
+  _dnd = {on:true, id, ghost, overRow:null, offY: cy - rect.top};
+
+  document.addEventListener('mousemove',  _dndMove);
+  document.addEventListener('touchmove',  _dndMove, {passive:false});
+  document.addEventListener('mouseup',    _dndEnd);
+  document.addEventListener('touchend',   _dndEnd);
+}
+
+function _dndMove(e) {
+  if (!_dnd.on) return;
+  e.preventDefault();
+  const cy = e.touches ? e.touches[0].clientY : e.clientY;
+  const cx = e.touches ? e.touches[0].clientX : e.clientX;
+  _dnd.ghost.style.top = (cy - _dnd.offY) + 'px';
+
+  _dnd.ghost.style.visibility = 'hidden';
+  const el = document.elementFromPoint(cx, cy);
+  _dnd.ghost.style.visibility = '';
+  const over = el && el.closest('li[id^="ch-row-"]');
+
+  if (_dnd.overRow && _dnd.overRow !== over) {
+    _dnd.overRow.style.borderTop = '';
+    _dnd.overRow.style.borderBottom = '';
+  }
+  if (over && over.id !== 'ch-row-' + _dnd.id) {
+    const half = over.getBoundingClientRect().top + over.getBoundingClientRect().height / 2;
+    if (cy < half) { over.style.borderTop = '2px solid #58a6ff'; over.style.borderBottom = ''; }
+    else           { over.style.borderBottom = '2px solid #58a6ff'; over.style.borderTop = ''; }
+    _dnd.overRow = over;
+  } else if (!over) {
+    _dnd.overRow = null;
+  }
+}
+
+function _dndEnd(e) {
+  if (!_dnd.on) return;
+  document.removeEventListener('mousemove',  _dndMove);
+  document.removeEventListener('touchmove',  _dndMove);
+  document.removeEventListener('mouseup',    _dndEnd);
+  document.removeEventListener('touchend',   _dndEnd);
+
+  const cy = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+  _dnd.ghost.remove();
+  const srcRow = document.getElementById('ch-row-' + _dnd.id);
+  srcRow.style.opacity = '';
+
+  if (_dnd.overRow) {
+    const half = _dnd.overRow.getBoundingClientRect().top + _dnd.overRow.getBoundingClientRect().height / 2;
+    _dnd.overRow.style.borderTop = '';
+    _dnd.overRow.style.borderBottom = '';
+    const list = document.getElementById('channel-list');
+    if (cy < half) list.insertBefore(srcRow, _dnd.overRow);
+    else           list.insertBefore(srcRow, _dnd.overRow.nextSibling);
+    const order = [...list.querySelectorAll('li[id^="ch-row-"]')]
+      .map(r => parseInt(r.id.replace('ch-row-', '')));
+    api('/api/channels/reorder', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({order})
+    }).catch(err => console.error('reorder failed', err));
+  }
+  _dnd = {on:false, id:null, ghost:null, overRow:null, offY:0};
 }
 
 // ── Tester: imagen ──────────────────────────────
