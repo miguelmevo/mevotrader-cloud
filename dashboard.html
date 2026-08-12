@@ -121,7 +121,7 @@ button.danger:hover{background:#8b3a3a}
       <h2>Último Setup</h2>
     </div>
     <div class="card-body" id="last-signal-card">
-      <div class="empty">Sin señales aún</div>
+      <div class="empty">Sin alertas aún</div>
     </div>
   </div>
 
@@ -302,7 +302,7 @@ function setChip(el, label, ok, neutral=false) {
 function renderLastSignalCard(sig) {
   const el = document.getElementById('last-signal-card');
   if (!sig) {
-    el.innerHTML = '<div class="empty">Sin señales aún</div>';
+    el.innerHTML = '<div class="empty">Sin alertas aún</div>';
     return;
   }
   const dir = sig.direction || '';
@@ -358,7 +358,7 @@ async function loadChannels() {
         '<span style="font-size:11px;color:#8b949e">Railway var</span>';
 
       const historyRows = stats.history.length === 0
-        ? '<tr><td colspan="6" style="padding:10px;text-align:center;color:#8b949e;font-size:12px">Sin señales aún</td></tr>'
+        ? '<tr><td colspan="6" style="padding:10px;text-align:center;color:#8b949e;font-size:12px">Sin alertas aún</td></tr>'
         : stats.history.map(s => {
             const dir = s.direction || '';
             const cls = s.action === 'close' ? 'close' : (dir === 'BUY' ? 'buy' : 'sell');
@@ -414,7 +414,7 @@ async function loadChannels() {
           <div style="display:flex;align-items:center;gap:8px">
             <div class="ch-stats">
               <span style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:3px 10px;font-size:12px;color:#e6edf3">
-                Señales <strong>${stats.total}</strong>
+                Alertas <strong>${stats.total}</strong>
               </span>
               <span style="background:#0d2818;border:1px solid #238636;border-radius:6px;padding:3px 10px;font-size:12px;color:#3fb950">
                 Compras <strong>${stats.buys}</strong>
@@ -589,7 +589,7 @@ async function suggestParser() {
     const confLabel = conf === 'high' ? '🟢 Alta' : conf === 'medium' ? '🟡 Media' : '🔴 Baja';
     const dirColor = s.direction === 'BUY' ? '#3fb950' : '#f85149';
     res.innerHTML = `
-      <div style="margin-bottom:10px;font-size:13px;color:#79c0ff;font-weight:600">🤖 Claude detectó esta señal:</div>
+      <div style="margin-bottom:10px;font-size:13px;color:#79c0ff;font-weight:600">🤖 Claude detectó esta alerta:</div>
       <table style="border-collapse:collapse;width:100%">
         <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Tipo</td><td style="color:#e6edf3">${s.type === 'open' ? '🟢 Apertura' : '🔴 Cierre'}</td></tr>
         <tr><td style="color:#8b949e;padding:2px 12px 2px 0">Símbolo</td><td style="color:#e6edf3;font-weight:600">${s.symbol}</td></tr>
@@ -742,7 +742,7 @@ async function testParse() {
       const TIPO_ES = { 'open': 'Apertura', 'close': 'Cierre', 'unknown': 'Desconocido' };
       const dirColor = sig.direction === 'BUY' ? '#3fb950' : '#f85149';
       res.style.display = 'block';
-      res.innerHTML = `<span style="color:#3fb950;font-weight:600">✓ Señal reconocida</span>
+      res.innerHTML = `<span style="color:#3fb950;font-weight:600">✓ Alerta reconocida</span>
 <span style="color:#8b949e;font-size:11px"> — ${FORMAT_NAMES[sig.format] || sig.format}</span>
 
 <table style="border-collapse:collapse;margin-top:8px;width:100%">

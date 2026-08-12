@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //|  MevoTrader.mq5                                                  |
-//|  Polling al servidor en la nube + ejecución de señales           |
+//|  Polling al servidor en la nube + ejecución de alertas           |
 //|  Requiere: Tools → Options → Expert Advisors → Allow WebRequest  |
 //+------------------------------------------------------------------+
 #property copyright "MevoTrader"
@@ -29,7 +29,7 @@ input ENUM_LOT_MODE LotMode    = LOT_FIXED;
 input double        LotValue   = 0.10;   // Lotes si FIJO, % balance si PORCENTAJE
 
 input group "═══ SL / TP ═══"
-input int    DefaultSL_Ticks   = 50;     // SL en ticks si señal no trae SL (fallback global)
+input int    DefaultSL_Ticks   = 50;     // SL en ticks si alerta no trae SL (fallback global)
 input string DefaultSL_Map     = "XAUUSD:500,DJ30ft:700,EURUSD:300,GBPUSD:300"; // SL por instrumento (sin sufijo)
 input double RR                = 2.0;    // Risk:Reward para calcular TP
 
@@ -45,7 +45,7 @@ input double       BE_Value    = 1.0;    // RR o USD según el modo
 input group "═══ IDENTIFICACIÓN ═══"
 input int    MagicNumber       = 20240101;
 
-//--- Estructura señal pendiente
+//--- Estructura alerta pendiente
 struct PendingSignal {
    string   id;
    string   symbol;
@@ -139,14 +139,14 @@ void PollServer()
 
    // Verificar símbolo base (sin sufijo del broker)
    if(!IsSymbolAllowed(symbol)) {
-      Print("Símbolo no permitido: ", symbol, " — señal descartada");
+      Print("Símbolo no permitido: ", symbol, " — alerta descartada");
       AckSignal(signal_id);
       return;
    }
 
    // Agregar sufijo del broker para la ejecución real
    string broker_symbol = symbol + SymbolSuffix;
-   Print("Señal [", signal_id, "]: ", action, " ", broker_symbol, " ", direction);
+   Print("Alerta [", signal_id, "]: ", action, " ", broker_symbol, " ", direction);
 
    if(action == "close") {
       ClosePositions(broker_symbol, channel_id);
@@ -197,7 +197,7 @@ void CheckPendingSignal()
       if(price_now < range_lo || price_now > range_hi) {
          string reason = "Precio " + DoubleToString(price_now,5) + " fuera del rango ["
                          + DoubleToString(range_lo,5) + " - " + DoubleToString(range_hi,5) + "]";
-         Print("Señal cancelada — ", reason);
+         Print("Alerta cancelada — ", reason);
          Pending.active = false;
          ReportResult(sig_id, false, reason);
          return;
@@ -206,7 +206,7 @@ void CheckPendingSignal()
       double deviation = MathAbs(price_now - Pending.pe) / tick_size;
       if(deviation > MaxDeviationTicks) {
          string reason = "Desviación " + DoubleToString(deviation,1) + " ticks (máx " + IntegerToString(MaxDeviationTicks) + ")";
-         Print("Señal cancelada — ", reason);
+         Print("Alerta cancelada — ", reason);
          Pending.active = false;
          ReportResult(sig_id, false, reason);
          return;
@@ -365,9 +365,9 @@ void ReportResult(string signal_id, bool executed, string detail, ulong ticket=0
    string result_headers;
    int res = WebRequest("POST", url, "Content-Type: application/json\r\n", 5000, post, result, result_headers);
    if(res == -1)
-      Print("ReportResult FAIL — WebRequest error, signal=", signal_id);
+      Print("ReportResult FAIL — WebRequest error, alerta=", signal_id);
    else
-      Print("ReportResult OK — signal=", signal_id, " executed=", executed, " HTTP=", res);
+      Print("ReportResult OK — alerta=", signal_id, " executed=", executed, " HTTP=", res);
 }
 
 string ChShort(string ch) {

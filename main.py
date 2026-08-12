@@ -224,8 +224,8 @@ async def ack_signal(signal_id: str, secret: str = Query(...)):
     check_secret(secret)
     global pending_for_ea
     if pending_for_ea and pending_for_ea.get("id") == signal_id:
-        log.info("EA confirmó señal %s", signal_id)
-        _add_log(f"EA ejecutó señal {signal_id}")
+        log.info("EA confirmó alerta %s", signal_id)
+        _add_log(f"EA ejecutó alerta {signal_id}")
         pending_for_ea = None
     return {"ok": True}
 
@@ -258,9 +258,9 @@ async def signal_result(body: dict, secret: str = Query(...)):
 
     # Notificar por Telegram
     if executed:
-        msg = f"✅ *Señal ejecutada en MT5*\nTicket: `{ticket}` | Precio real: `{price}`"
+        msg = f"✅ *Alerta ejecutada en MT5*\nTicket: `{ticket}` | Precio real: `{price}`"
     else:
-        msg = f"⚠️ *Señal NO ejecutada*\nMotivo: {detail}"
+        msg = f"⚠️ *Alerta NO ejecutada*\nMotivo: {detail}"
     _add_log(("✅ Ejecutada" if executed else "⚠️ No ejecutada") + f" — {signal_id} {detail}")
     if _bot_ref:
         await _alert(msg)
@@ -565,7 +565,7 @@ async def suggest_parser(body: dict, secret: str = Query(...)):
         return {"ok": False, "reason": "Falta ANTHROPIC_API_KEY en Railway"}
     data = await _parse_suggest(text)
     if data is None:
-        return {"ok": False, "reason": "Claude no pudo interpretar este mensaje como señal de trading"}
+        return {"ok": False, "reason": "Claude no pudo interpretar este mensaje como alerta de trading"}
     signal = {
         "type":      data.get("type", "open"),
         "symbol":    data.get("symbol", ""),
@@ -651,10 +651,10 @@ async def send_confirmation(bot: Bot, signal: Signal, resolved_symbol: str, chan
     await asyncio.sleep(timeout)
     if callback_id in pending_for_user:
         del pending_for_user[callback_id]
-        _add_log(f"Señal expirada — {resolved_symbol}")
+        _add_log(f"Alerta expirada — {resolved_symbol}")
         await bot.send_message(
             chat_id=cfg["telegram"]["admin_chat_id"],
-            text=f"⏱ Señal expirada — {resolved_symbol}",
+            text=f"⏱ Alerta expirada — {resolved_symbol}",
         )
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -665,7 +665,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action, callback_id = query.data.split(":", 1)
 
     if callback_id not in pending_for_user:
-        await query.edit_message_text("⚠️ Señal ya expirada o procesada.")
+        await query.edit_message_text("⚠️ Alerta ya expirada o procesada.")
         return
 
     signal_data = pending_for_user.pop(callback_id)
@@ -684,7 +684,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ Aprobada — {signal_data['symbol']} {signal_data['direction']}\n"
         f"El EA ejecutará en el próximo ciclo.",
     )
-    log.info("Señal aprobada y en cola para EA: %s", signal_data)
+    log.info("Alerta aprobada y en cola para EA: %s", signal_data)
 
 # -------------------------------------------------------------------
 # Telethon
@@ -714,7 +714,7 @@ def _make_handler(client: TelegramClient):
             env_names = cfg["telegram"].get("channel_names", {})
             channel_name = env_names.get(chat_id, env_names.get(norm_id, str(norm_id)))
 
-        log.info("Señal: %s %s %s canal=%s", signal.type.value, resolved, signal.direction, channel_name)
+        log.info("Alerta: %s %s %s canal=%s", signal.type.value, resolved, signal.direction, channel_name)
 
         if signal.type == SignalType.OPEN:
             if confirm_required:

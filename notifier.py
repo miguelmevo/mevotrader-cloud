@@ -30,7 +30,7 @@ def format_open_message(signal: Signal, resolved_symbol: str, lots: float, chann
     tp_str = f"\nTP: `{signal.tp}`" if signal.tp else ""
     ch_str = f"\n📢 Canal: *{channel_name}*" if channel_name and channel_name != "—" else ""
     return (
-        f"📡 *NUEVA SEÑAL — {signal.trader}*\n\n"
+        f"📡 *NUEVA ALERTA — {signal.trader}*\n\n"
         f"*{resolved_symbol}* — `{signal.direction}`\n"
         f"Precio: `{signal.price}`"
         f"{sl_str}{tp_str}"
@@ -47,7 +47,7 @@ def format_close_message(signal: Signal, resolved_symbol: str, channel_name: str
         f"🔴 *CIERRE — {signal.trader}*\n\n"
         f"*{resolved_symbol}* — `{signal.direction}`\n"
         f"Apertura: `{signal.open_price}` → Cierre: `{signal.close_price}`\n"
-        f"Resultado señal: `{pips_str}` | `{profit_str}`"
+        f"Resultado alerta: `{pips_str}` | `{profit_str}`"
         f"{ch_str}\n\n"
         f"¿Cerrar tu posición?"
     )
@@ -55,7 +55,7 @@ def format_close_message(signal: Signal, resolved_symbol: str, channel_name: str
 
 def notify_desktop_open(signal: Signal, resolved_symbol: str, lots: float):
     desktop_notification(
-        title=f"Señal ABRIR — {resolved_symbol}",
+        title=f"Alerta ABRIR — {resolved_symbol}",
         body=f"{signal.direction} {lots} lots @ {signal.price}",
         subtitle=f"Trader: {signal.trader}",
     )
@@ -63,7 +63,7 @@ def notify_desktop_open(signal: Signal, resolved_symbol: str, lots: float):
 
 def notify_desktop_close(signal: Signal, resolved_symbol: str):
     desktop_notification(
-        title=f"Señal CERRAR — {resolved_symbol}",
+        title=f"Alerta CERRAR — {resolved_symbol}",
         body=f"{signal.direction} | {signal.pips:+.1f} pips" if signal.pips else signal.direction,
         subtitle=f"Trader: {signal.trader}",
     )
