@@ -362,15 +362,25 @@ async function loadChannels() {
         : stats.history.map(s => {
             const dir = s.direction || '';
             const cls = s.action === 'close' ? 'close' : (dir === 'BUY' ? 'buy' : 'sell');
-            const sc = s.status === 'aprobada' || s.status === 'auto-aprobada' ? '#3fb950'
-                     : s.status === 'rechazada' ? '#f85149' : '#d29922';
+            const sc = s.status === 'ejecutada'     ? '#3fb950'
+                     : s.status === 'no ejecutada'  ? '#f85149'
+                     : s.status === 'rechazada'     ? '#f85149'
+                     : s.status === 'aprobada' || s.status === 'auto-aprobada' ? '#d29922'
+                     : '#8b949e';
+            const statusLabel = s.status === 'ejecutada'     ? '✅ Ejecutada'
+                              : s.status === 'no ejecutada'  ? '❌ No ejecutada'
+                              : s.status === 'rechazada'     ? 'Rechazada'
+                              : s.status === 'auto-aprobada' ? 'Auto-aprobada'
+                              : s.status === 'aprobada'      ? 'Aprobada'
+                              : capitalize(s.status||'—');
+            const statusTitle = s.mt5_detail ? `title="${s.mt5_detail}"` : '';
             return `<tr style="border-bottom:1px solid #21262d">
               <td style="padding:6px 8px"><span class="badge ${cls}">${s.action==='close'?'CLOSE':dir}</span></td>
               <td style="padding:6px 8px;font-weight:600">${s.symbol||'—'}</td>
               <td style="padding:6px 8px;color:#8b949e">${s.pe||'—'}</td>
               <td style="padding:6px 8px;color:#f85149">${s.sl>0?s.sl:'—'}</td>
               <td style="padding:6px 8px;color:#3fb950">${s.tp>0?s.tp:'—'}</td>
-              <td style="padding:6px 8px;color:${sc}">${capitalize(s.status||'—')}</td>
+              <td style="padding:6px 8px;color:${sc}" ${statusTitle}>${statusLabel}</td>
               <td style="padding:6px 8px;color:#8b949e;font-size:11px;font-family:monospace">${s.datetime||s.time||'—'}</td>
               <td style="padding:4px 8px">
                 <select class="result-sel" style="color:${rsColor(s.result||'')}"
