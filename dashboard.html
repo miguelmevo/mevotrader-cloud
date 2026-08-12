@@ -92,7 +92,7 @@ button.danger:hover{background:#8b3a3a}
     MevoTrader
   </div>
   <div class="status-chips">
-    <div class="chip" id="chip-telethon">Telethon —</div>
+    <div class="chip" id="chip-telethon">TradingView —</div>
     <div class="chip" id="chip-bot">Bot —</div>
     <div class="chip" id="chip-ea">EA —</div>
     <button id="btn-confirm" onclick="toggleConfirm()" style="font-size:12px;padding:3px 12px;border-radius:20px;border:1px solid #d29922;background:#2a1f00;color:#d29922;cursor:pointer">⚡ Auto-aprobar</button>
@@ -235,7 +235,7 @@ async function loadStatus() {
     const cEa = document.getElementById('chip-ea');
 
     tDot.className = 'dot' + (s.telethon_connected ? '' : ' red');
-    setChip(cTelethon, 'Telethon', s.telethon_connected);
+    setChip(cTelethon, 'TradingView', s.telethon_connected);
     setChip(cBot, 'Bot', s.bot_running);
     setChip(cEa, 'EA', !!s.ea_connected, true);
 
@@ -447,7 +447,7 @@ async function loadChannels() {
         </div>
       </li>`;
     }).join('');
-    document.getElementById('stat-channels').textContent = data.channels.length;
+    document.getElementById('stat-channels').textContent = data.channels.filter(ch => ch.active !== false).length;
     // Restaurar filas que estaban abiertas antes del re-render
     _openHistories.forEach(id => {
       const el = document.getElementById(id);
