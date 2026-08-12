@@ -330,7 +330,7 @@ async def api_remove_channel(channel_id: int, secret: str = Query(...)):
     check_secret(secret)
     extra_channels.pop(channel_id, None)
     _save_extra_channels()
-    _add_log(f"Canal eliminado: {channel_id}")
+    _add_log(f"Instrumento eliminado: {channel_id}")
     return {"ok": True}
 
 @app.post("/api/confirm/toggle")
@@ -350,7 +350,7 @@ async def api_toggle_channel(channel_id: int, secret: str = Query(...)):
     extra_channels[channel_id]["active"] = not extra_channels[channel_id].get("active", True)
     _save_extra_channels()
     active = extra_channels[channel_id]["active"]
-    _add_log(f"Canal {'activado' if active else 'pausado'}: {extra_channels[channel_id]['name']}")
+    _add_log(f"Instrumento {'activado' if active else 'pausado'}: {extra_channels[channel_id]['name']}")
     return {"id": channel_id, "active": active}
 
 @app.get("/api/logs")
