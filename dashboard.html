@@ -424,8 +424,8 @@ async function loadChannels() {
             <div style="display:flex;align-items:center;gap:4px">
               <span class="channel-name" style="${mob ? 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px' : ''}">${mobName}</span>
               ${isDynamic && !mob ? `<button onclick="event.stopPropagation();renameChannel(${ch.id},'${(ch.name||'').replace(/'/g,"\\\'")}')"
-                style="background:none;border:none;cursor:pointer;font-size:11px;padding:0;color:#484f58;line-height:1;flex-shrink:0;opacity:0.5" title="Renombrar"
-                onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'">✏️</button>` : ''}
+                style="background:none;border:none;cursor:pointer;font-size:9px;padding:0;color:#484f58;line-height:1;flex-shrink:0;opacity:0.35;filter:grayscale(1)" title="Renombrar"
+                onmouseover="this.style.opacity='0.8';this.style.filter='grayscale(0)'" onmouseout="this.style.opacity='0.35';this.style.filter='grayscale(1)'">✏️</button>` : ''}
             </div>
             <span class="channel-source">${ch.source === 'env' ? '(variable env)' : ''}</span>${mob ? '' : '<br>'}
             <span class="channel-id">${ch.id}</span>
