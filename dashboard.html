@@ -117,11 +117,11 @@ button.danger:hover{background:#8b3a3a}
   </div>
 
   <div class="card">
-    <div class="card-header" onclick="toggleLastSetup()" style="cursor:pointer;user-select:none">
+    <div class="card-header" id="last-setup-header">
       <h2>Último Setup</h2>
-      <span id="last-setup-chev" style="color:#8b949e;font-size:12px;display:inline-block;transform:rotate(-90deg);transition:transform 0.2s">▼</span>
+      <span id="last-setup-chev" style="color:#8b949e;font-size:12px;display:none;transform:rotate(-90deg);transition:transform 0.2s">▼</span>
     </div>
-    <div class="card-body" id="last-signal-card" style="display:none">
+    <div class="card-body" id="last-signal-card">
       <div class="empty">Sin alertas aún</div>
     </div>
   </div>
@@ -279,14 +279,15 @@ async function toggleChannel(id) {
     const data = await api(`/api/channels/${id}/toggle`, {method: 'POST'});
     const btn = document.getElementById('toggle-' + id);
     if (!btn) return;
-    if (data.active) {
-      btn.textContent = '▶️';
-      btn.style.borderColor = '#238636';
-      btn.style.background = '#0d2818';
+    if (isMobile()) {
+      btn.textContent = data.active ? '▶️' : '⏸️';
+      btn.style.borderColor = data.active ? '#238636' : '#30363d';
+      btn.style.background  = data.active ? '#0d2818' : '#161b22';
     } else {
-      btn.textContent = '⏸️';
-      btn.style.borderColor = '#30363d';
-      btn.style.background = '#161b22';
+      btn.textContent = data.active ? '● Activo' : '⏸ Pausado';
+      btn.style.borderColor = data.active ? '#238636' : '#6e2e2e';
+      btn.style.background  = data.active ? '#0d2818' : '#2d1117';
+      btn.style.color       = data.active ? '#3fb950' : '#f85149';
     }
   } catch(e) {
     alert('Error: ' + e.message);
@@ -348,7 +349,8 @@ async function loadChannels() {
       const active = ch.active !== false;
       const isDynamic = ch.source !== 'env';
       const stats = ch.stats || {total:0, buys:0, sells:0, history:[]};
-      const toggleBtn = isDynamic ? `
+      const mob = isMobile();
+      const toggleBtn = isDynamic ? (mob ? `
         <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
           style="padding:4px 8px;font-size:16px;border-radius:6px;border:1px solid ${active ? '#238636' : '#30363d'};background:${active ? '#0d2818' : '#161b22'};cursor:pointer;line-height:1">
           ${active ? '▶️' : '⏸️'}
@@ -356,8 +358,13 @@ async function loadChannels() {
         <button onclick="event.stopPropagation();removeChannel(${ch.id})"
           style="padding:4px 8px;font-size:16px;border-radius:6px;border:1px solid #6e2e2e;background:#2d1117;cursor:pointer;line-height:1;margin-left:4px">
           🗑️
-        </button>` :
-        '';
+        </button>` : `
+        <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
+          style="padding:4px 10px;font-size:12px;border-radius:6px;border:1px solid ${active ? '#238636' : '#6e2e2e'};background:${active ? '#0d2818' : '#2d1117'};color:${active ? '#3fb950' : '#f85149'};cursor:pointer">
+          ${active ? '● Activo' : '⏸ Pausado'}
+        </button>
+        <button class="danger" style="padding:4px 10px;font-size:12px;margin-left:4px" onclick="event.stopPropagation();removeChannel(${ch.id})">Quitar</button>`) :
+        (mob ? '' : '<span style="font-size:11px;color:#8b949e">Railway var</span>');
 
       const historyRows = stats.history.length === 0
         ? '<tr><td colspan="6" style="padding:10px;text-align:center;color:#8b949e;font-size:12px">Sin alertas aún</td></tr>'
@@ -416,16 +423,17 @@ async function loadChannels() {
           <div style="display:flex;align-items:center;gap:8px">
             <div class="ch-stats">
               <span style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:3px 8px;font-size:12px;color:#e6edf3">
-                A: <strong>${stats.total}</strong>
+                ${mob ? 'A:' : 'Alertas'} <strong>${stats.total}</strong>
               </span>
               <span style="background:#0d2818;border:1px solid #238636;border-radius:6px;padding:3px 8px;font-size:12px;color:#3fb950">
-                <strong>${stats.buys}</strong>
+                ${mob ? '' : 'Compras '}<strong>${stats.buys}</strong>
               </span>
               <span style="background:#2d1117;border:1px solid #6e2e2e;border-radius:6px;padding:3px 8px;font-size:12px;color:#f85149">
-                <strong>${stats.sells}</strong>
+                ${mob ? '' : 'Ventas '}<strong>${stats.sells}</strong>
               </span>
             </div>
             <div class="ch-actions" onclick="event.stopPropagation()">${toggleBtn}</div>
+            ${mob ? '' : `<span style="color:#8b949e;font-size:12px" id="chev-${ch.id}">▼</span>`}
           </div>
         </div>
         <div id="hist-${ch.id}" style="display:none;overflow-x:auto;border-top:1px solid #21262d">
@@ -808,28 +816,51 @@ function capitalize(str) {
 
 const _openHistories = new Set();
 
+function isMobile() { return window.innerWidth < 768; }
+
 function toggleChannelHistory(id) {
   const el = document.getElementById(id);
+  const chev = document.getElementById('chev-' + id.replace('hist-', ''));
   const isOpen = el.style.display !== 'none';
-  // Cerrar todas las demás (acordeón)
-  _openHistories.forEach(openId => {
-    const openEl = document.getElementById(openId);
-    if (openEl) openEl.style.display = 'none';
-  });
-  _openHistories.clear();
-  // Si estaba cerrada, abrir esta
-  if (!isOpen) {
-    el.style.display = 'block';
-    _openHistories.add(id);
+  // En móvil: acordeón — cerrar todas las demás
+  if (isMobile() && !isOpen) {
+    _openHistories.forEach(openId => {
+      const openEl = document.getElementById(openId);
+      if (openEl) openEl.style.display = 'none';
+    });
+    _openHistories.clear();
   }
+  el.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+  if (isOpen) _openHistories.delete(id);
+  else _openHistories.add(id);
 }
 
 function toggleLastSetup() {
+  if (!isMobile()) return;
   const body = document.getElementById('last-signal-card');
   const chev = document.getElementById('last-setup-chev');
   const isOpen = body.style.display !== 'none';
   body.style.display = isOpen ? 'none' : 'block';
   chev.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+
+function initLastSetup() {
+  const header = document.getElementById('last-setup-header');
+  const chev   = document.getElementById('last-setup-chev');
+  const body   = document.getElementById('last-signal-card');
+  if (isMobile()) {
+    header.style.cursor = 'pointer';
+    header.style.userSelect = 'none';
+    header.onclick = toggleLastSetup;
+    chev.style.display = 'inline-block';
+    body.style.display = 'none';
+  } else {
+    header.style.cursor = '';
+    header.onclick = null;
+    chev.style.display = 'none';
+    body.style.display = 'block';
+  }
 }
 
 function toggleTester() {
@@ -865,11 +896,13 @@ if (!SECRET) {
     </code>
   </div>`;
 } else {
+  initLastSetup();
   loadStatus();
   loadChannels();
   loadLogs();
   setInterval(loadStatus, 10000);
   setInterval(loadLogs, 15000);
+  window.addEventListener('resize', initLastSetup);
 }
 </script>
 </body>
