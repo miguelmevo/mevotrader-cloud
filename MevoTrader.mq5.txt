@@ -15,8 +15,8 @@ enum ENUM_BE_MODE  { BE_BY_RR=0,  BE_BY_USD=1   };
 
 //--- Inputs
 input group "═══ SERVIDOR EN LA NUBE ═══"
-input string CloudURL          = "https://tu-app.railway.app"; // URL del servidor Railway
-input string EA_Secret         = "CAMBIA_ESTO";                // Clave secreta compartida
+input string CloudURL          = "https://web-production-80ce.up.railway.app"; // URL del servidor Railway
+input string EA_Secret         = "mevo2024secretkey";                           // Clave secreta compartida
 input int    PollSeconds       = 5;                            // Segundos entre cada consulta
 
 input group "═══ INSTRUMENTOS ═══"
@@ -359,11 +359,15 @@ void ReportResult(string signal_id, bool executed, string detail, ulong ticket=0
       + "\"price\":\"" + (exec_price > 0 ? DoubleToString(exec_price, 5) : "") + "\""
       + "}";
    char post[];
-   int len = StringToCharArray(body_str, post, 0, StringLen(body_str));
-   ArrayResize(post, len - 1);
+   StringToCharArray(body_str, post);
+   ArrayResize(post, ArraySize(post) - 1);
    char result[];
    string result_headers;
-   WebRequest("POST", url, "Content-Type: application/json\r\n", 5000, post, result, result_headers);
+   int res = WebRequest("POST", url, "Content-Type: application/json\r\n", 5000, post, result, result_headers);
+   if(res == -1)
+      Print("ReportResult FAIL — WebRequest error, signal=", signal_id);
+   else
+      Print("ReportResult OK — signal=", signal_id, " executed=", executed, " HTTP=", res);
 }
 
 string ChShort(string ch) {

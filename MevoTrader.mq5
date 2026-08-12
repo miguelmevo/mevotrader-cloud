@@ -359,11 +359,15 @@ void ReportResult(string signal_id, bool executed, string detail, ulong ticket=0
       + "\"price\":\"" + (exec_price > 0 ? DoubleToString(exec_price, 5) : "") + "\""
       + "}";
    char post[];
-   int len = StringToCharArray(body_str, post, 0, StringLen(body_str));
-   ArrayResize(post, len - 1);
+   StringToCharArray(body_str, post);
+   ArrayResize(post, ArraySize(post) - 1);
    char result[];
    string result_headers;
-   WebRequest("POST", url, "Content-Type: application/json\r\n", 5000, post, result, result_headers);
+   int res = WebRequest("POST", url, "Content-Type: application/json\r\n", 5000, post, result, result_headers);
+   if(res == -1)
+      Print("ReportResult FAIL — WebRequest error, signal=", signal_id);
+   else
+      Print("ReportResult OK — signal=", signal_id, " executed=", executed, " HTTP=", res);
 }
 
 string ChShort(string ch) {
