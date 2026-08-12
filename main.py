@@ -325,6 +325,19 @@ async def api_add_channel(body: dict, secret: str = Query(...)):
     log.info("Instrumento agregado: %s (%s)", ch_name, ch_id)
     return {"ok": True}
 
+@app.patch("/api/channels/{channel_id}")
+async def api_rename_channel(channel_id: int, body: dict, secret: str = Query(...)):
+    check_secret(secret)
+    if channel_id not in extra_channels:
+        raise HTTPException(status_code=404, detail="Instrumento no encontrado")
+    new_name = str(body.get("name", "")).strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Nombre requerido")
+    extra_channels[channel_id]["name"] = new_name
+    _save_extra_channels()
+    _add_log(f"Instrumento renombrado: {str(abs(channel_id))[-5:]} → {new_name}")
+    return {"ok": True, "name": new_name}
+
 @app.delete("/api/channels/{channel_id}")
 async def api_remove_channel(channel_id: int, secret: str = Query(...)):
     check_secret(secret)

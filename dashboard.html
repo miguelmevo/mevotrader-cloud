@@ -415,7 +415,11 @@ async function loadChannels() {
         <div onclick="toggleChannelHistory('hist-${ch.id}')"
              style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer;gap:6px">
           <div style="min-width:0;flex:1;overflow:hidden">
-            <span class="channel-name" style="${mob ? 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block' : ''}">${mobName}</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span class="channel-name" style="${mob ? 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px' : ''}">${mobName}</span>
+              ${isDynamic ? `<button onclick="event.stopPropagation();renameChannel(${ch.id},'${(ch.name||'').replace(/'/g,"\\\'")}')"
+                style="background:none;border:none;cursor:pointer;font-size:${mob?'14':'12'}px;padding:0;color:#8b949e;line-height:1;flex-shrink:0" title="Renombrar">✏️</button>` : ''}
+            </div>
             <span class="channel-source">${ch.source === 'env' ? '(variable env)' : ''}</span>${mob ? '' : '<br>'}
             <span class="channel-id">${ch.id}</span>
           </div>
@@ -485,6 +489,19 @@ async function addChannel() {
     document.getElementById('new-channel-name').value = '';
     toggleAddForm();
     loadChannels();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function renameChannel(id, currentName) {
+  const newName = prompt('Nuevo nombre del instrumento:', currentName);
+  if (!newName || newName.trim() === currentName) return;
+  try {
+    const data = await api('/api/channels/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({name: newName.trim()})
+    });
+    if (data.ok) loadChannels();
   } catch(e) { alert('Error: ' + e.message); }
 }
 
