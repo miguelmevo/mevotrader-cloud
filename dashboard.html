@@ -237,7 +237,7 @@ async function loadStatus() {
     tDot.className = 'dot' + (s.telethon_connected ? '' : ' red');
     setChip(cTelethon, 'Telethon', s.telethon_connected);
     setChip(cBot, 'Bot', s.bot_running);
-    setChip(cEa, 'EA', !!s.pending_for_ea, true);
+    setChip(cEa, 'EA', !!s.ea_connected, true);
 
     const lastSig = s.signal_history && s.signal_history.length > 0 ? s.signal_history[0] : s.last_signal;
     renderLastSignalCard(lastSig);

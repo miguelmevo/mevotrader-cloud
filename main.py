@@ -208,10 +208,13 @@ async def dashboard():
     return HTMLResponse("<h1>MevoTrader</h1><p>dashboard.html not found</p>")
 
 # --- EA endpoints ---
+_ea_last_poll: Optional[datetime] = None
 
 @app.get("/signal/pending")
 async def get_pending_signal(secret: str = Query(...)):
+    global _ea_last_poll
     check_secret(secret)
+    _ea_last_poll = datetime.utcnow()
     if pending_for_ea is None:
         return None
     return pending_for_ea
@@ -278,6 +281,7 @@ async def api_status(secret: str = Query(...)):
     return {
         "telethon_connected": telethon_connected,
         "bot_running":        bot_running,
+        "ea_connected":       _ea_last_poll is not None and (datetime.utcnow() - _ea_last_poll).total_seconds() < 30,
         "pending_for_ea":     pending_for_ea,
         "last_signal":        last_signal,
         "signal_history":     list(reversed(list(signal_history))),
