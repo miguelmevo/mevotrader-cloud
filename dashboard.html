@@ -281,8 +281,6 @@ async function toggleChannel(id) {
     if (!btn) return;
     if (isMobile()) {
       btn.textContent = data.active ? '▶️' : '⏸️';
-      btn.style.borderColor = data.active ? '#238636' : '#30363d';
-      btn.style.background  = data.active ? '#0d2818' : '#161b22';
     } else {
       btn.textContent = data.active ? '● Activo' : '⏸ Pausado';
       btn.style.borderColor = data.active ? '#238636' : '#6e2e2e';
@@ -350,13 +348,14 @@ async function loadChannels() {
       const isDynamic = ch.source !== 'env';
       const stats = ch.stats || {total:0, buys:0, sells:0, history:[]};
       const mob = isMobile();
+      const mobName = mob ? ((ch.name||'Sin nombre').split(' ')[0] || (ch.name||'Sin nombre')) : (ch.name||'Sin nombre');
       const toggleBtn = isDynamic ? (mob ? `
         <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
-          style="padding:4px 8px;font-size:16px;border-radius:6px;border:1px solid ${active ? '#238636' : '#30363d'};background:${active ? '#0d2818' : '#161b22'};cursor:pointer;line-height:1">
+          style="background:none;border:none;cursor:pointer;font-size:22px;padding:0;line-height:1">
           ${active ? '▶️' : '⏸️'}
         </button>
         <button onclick="event.stopPropagation();removeChannel(${ch.id})"
-          style="padding:4px 8px;font-size:16px;border-radius:6px;border:1px solid #6e2e2e;background:#2d1117;cursor:pointer;line-height:1;margin-left:4px">
+          style="background:none;border:none;cursor:pointer;font-size:22px;padding:0;line-height:1;margin-left:2px">
           🗑️
         </button>` : `
         <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
@@ -414,25 +413,25 @@ async function loadChannels() {
       return `
       <li class="channel-item" style="display:block;padding:0;border-bottom:1px solid #21262d">
         <div onclick="toggleChannelHistory('hist-${ch.id}')"
-             style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer">
-          <div>
-            <span class="channel-name">${ch.name || 'Sin nombre'}</span>
-            <span class="channel-source">${ch.source === 'env' ? '(variable env)' : ''}</span><br>
+             style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;cursor:pointer;gap:6px">
+          <div style="min-width:0;flex:1;overflow:hidden">
+            <span class="channel-name" style="${mob ? 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block' : ''}">${mobName}</span>
+            <span class="channel-source">${ch.source === 'env' ? '(variable env)' : ''}</span>${mob ? '' : '<br>'}
             <span class="channel-id">${ch.id}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div class="ch-stats">
-              <span style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:3px 8px;font-size:12px;color:#e6edf3">
+          <div style="display:flex;align-items:center;gap:${mob ? '5' : '8'}px;flex-shrink:0;white-space:nowrap">
+            <div class="ch-stats" style="display:flex;align-items:center;gap:${mob ? '4' : '6'}px;flex-shrink:0">
+              <span style="background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:3px 8px;font-size:12px;color:#e6edf3;white-space:nowrap">
                 ${mob ? 'A:' : 'Alertas'} <strong>${stats.total}</strong>
               </span>
-              <span style="background:#0d2818;border:1px solid #238636;border-radius:6px;padding:3px 8px;font-size:12px;color:#3fb950">
+              <span style="background:#0d2818;border:1px solid #238636;border-radius:6px;padding:3px 8px;font-size:12px;color:#3fb950;white-space:nowrap">
                 ${mob ? '' : 'Compras '}<strong>${stats.buys}</strong>
               </span>
-              <span style="background:#2d1117;border:1px solid #6e2e2e;border-radius:6px;padding:3px 8px;font-size:12px;color:#f85149">
+              <span style="background:#2d1117;border:1px solid #6e2e2e;border-radius:6px;padding:3px 8px;font-size:12px;color:#f85149;white-space:nowrap">
                 ${mob ? '' : 'Ventas '}<strong>${stats.sells}</strong>
               </span>
             </div>
-            <div class="ch-actions" onclick="event.stopPropagation()">${toggleBtn}</div>
+            <div class="ch-actions" style="display:flex;align-items:center" onclick="event.stopPropagation()">${toggleBtn}</div>
             ${mob ? '' : `<span style="color:#8b949e;font-size:12px" id="chev-${ch.id}">▼</span>`}
           </div>
         </div>
