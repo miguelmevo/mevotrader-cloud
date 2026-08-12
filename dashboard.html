@@ -280,7 +280,10 @@ async function toggleChannel(id) {
     const btn = document.getElementById('toggle-' + id);
     if (!btn) return;
     if (isMobile()) {
-      btn.textContent = data.active ? '▶️' : '⏸️';
+      btn.textContent = data.active ? '●' : '⏸';
+      btn.style.borderColor = data.active ? '#238636' : '#6e2e2e';
+      btn.style.background  = data.active ? '#0d2818' : '#2d1117';
+      btn.style.color       = data.active ? '#3fb950' : '#f85149';
     } else {
       btn.textContent = data.active ? '● Activo' : '⏸ Pausado';
       btn.style.borderColor = data.active ? '#238636' : '#6e2e2e';
@@ -351,11 +354,11 @@ async function loadChannels() {
       const mobName = mob ? ((ch.name||'Sin nombre').split(' ')[0] || (ch.name||'Sin nombre')) : (ch.name||'Sin nombre');
       const toggleBtn = isDynamic ? (mob ? `
         <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
-          style="background:none;border:none;cursor:pointer;font-size:22px;padding:0;line-height:1">
-          ${active ? '▶️' : '⏸️'}
+          style="padding:3px 8px;font-size:14px;border-radius:6px;border:1px solid ${active ? '#238636' : '#6e2e2e'};background:${active ? '#0d2818' : '#2d1117'};color:${active ? '#3fb950' : '#f85149'};cursor:pointer;line-height:1">
+          ${active ? '●' : '⏸'}
         </button>
         <button onclick="event.stopPropagation();removeChannel(${ch.id})"
-          style="background:none;border:none;cursor:pointer;font-size:22px;padding:0;line-height:1;margin-left:2px">
+          style="background:none;border:none;cursor:pointer;font-size:18px;padding:0;line-height:1;margin-left:4px">
           🗑️
         </button>` : `
         <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
