@@ -111,7 +111,7 @@ button.danger:hover{background:#8b3a3a}
         <div class="stat"><div class="stat-label">Recibidos</div><div class="stat-value" id="stat-signals">—</div></div>
         <div class="stat"><div class="stat-label">Ejecutadas</div><div class="stat-value green" id="stat-executed">—</div></div>
         <div class="stat"><div class="stat-label">Pendiente EA</div><div class="stat-value" id="stat-pending">—</div></div>
-        <div class="stat"><div class="stat-label">Canales activos</div><div class="stat-value green" id="stat-channels">—</div></div>
+        <div class="stat"><div class="stat-label">Instrumentos activos</div><div class="stat-value green" id="stat-channels">—</div></div>
       </div>
     </div>
   </div>
@@ -127,12 +127,12 @@ button.danger:hover{background:#8b3a3a}
 
   <div class="card card-full">
     <div class="card-header">
-      <h2>Canales monitoreados</h2>
+      <h2>Instrumentos monitoreados</h2>
       <button onclick="toggleAddForm()" style="padding:4px 10px;font-size:12px" id="add-btn">+ Agregar</button>
     </div>
     <div class="card-body">
       <div id="add-form" class="row">
-        <input type="text" id="new-channel-id" placeholder="ID del canal (ej: -1001234567890)" style="flex:1">
+        <input type="text" id="new-channel-id" placeholder="ID del instrumento (ej: -1001234567890)" style="flex:1">
         <input type="text" id="new-channel-name" placeholder="Nombre (ej: LumyArena)" style="flex:1">
         <button class="primary" onclick="addChannel()">Agregar</button>
         <button onclick="toggleAddForm()">Cancelar</button>
@@ -342,7 +342,7 @@ async function loadChannels() {
     const data = await api('/api/channels');
     const list = document.getElementById('channel-list');
     if (!data.channels || data.channels.length === 0) {
-      list.innerHTML = '<li class="empty">No hay canales configurados</li>';
+      list.innerHTML = '<li class="empty">No hay instrumentos configurados</li>';
       return;
     }
     list.innerHTML = data.channels.map(ch => {
@@ -456,7 +456,7 @@ async function loadChannels() {
       if (chev) chev.style.transform = 'rotate(0deg)';
     });
   } catch(e) {
-    document.getElementById('channel-list').innerHTML = '<li class="empty">Error cargando canales</li>';
+    document.getElementById('channel-list').innerHTML = '<li class="empty">Error cargando instrumentos</li>';
   }
 }
 

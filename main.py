@@ -297,7 +297,7 @@ async def api_channels(secret: str = Query(...)):
     empty_stats = lambda: {"total": 0, "buys": 0, "sells": 0, "history": []}
     env_names = cfg["telegram"].get("channel_names", {})
     env_channels = cfg["telegram"]["source_channel"]
-    result = [{"id": ch, "name": env_names.get(ch, env_names.get(abs(ch), f"Canal {abs(ch)}")),
+    result = [{"id": ch, "name": env_names.get(ch, env_names.get(abs(ch), f"Instrumento {abs(ch)}")),
                "source": "env",
                "stats": channel_stats.get(abs(ch), empty_stats())}
               for ch in env_channels]
@@ -321,8 +321,8 @@ async def api_add_channel(body: dict, secret: str = Query(...)):
             _make_handler(_telethon_client),
             events.NewMessage(chats=[ch_id])
         )
-    _add_log(f"Canal agregado: {ch_name} ({ch_id})")
-    log.info("Canal dinámico agregado: %s (%s)", ch_name, ch_id)
+    _add_log(f"Instrumento agregado: {ch_name} ({ch_id})")
+    log.info("Instrumento agregado: %s (%s)", ch_name, ch_id)
     return {"ok": True}
 
 @app.delete("/api/channels/{channel_id}")
@@ -346,7 +346,7 @@ async def api_toggle_confirm(secret: str = Query(...)):
 async def api_toggle_channel(channel_id: int, secret: str = Query(...)):
     check_secret(secret)
     if channel_id not in extra_channels:
-        raise HTTPException(status_code=404, detail="Canal no encontrado")
+        raise HTTPException(status_code=404, detail="Instrumento no encontrado")
     extra_channels[channel_id]["active"] = not extra_channels[channel_id].get("active", True)
     _save_extra_channels()
     active = extra_channels[channel_id]["active"]
@@ -714,7 +714,7 @@ def _make_handler(client: TelegramClient):
             env_names = cfg["telegram"].get("channel_names", {})
             channel_name = env_names.get(chat_id, env_names.get(norm_id, str(norm_id)))
 
-        log.info("Alerta: %s %s %s canal=%s", signal.type.value, resolved, signal.direction, channel_name)
+        log.info("Alerta: %s %s %s instrumento=%s", signal.type.value, resolved, signal.direction, channel_name)
 
         if signal.type == SignalType.OPEN:
             if confirm_required:
@@ -742,10 +742,10 @@ def _make_handler(client: TelegramClient):
                 signals_today += 1
                 signals_executed += 1
                 _update_channel_stats(chat_id, pending_for_ea)
-                _add_log(f"AUTO-APROBADA {resolved} {signal.direction}")
+                _add_log(f"AUTO-APROBADA {resolved} {signal.direction} [{str(norm_id)[-5:]}]")
                 await _bot_ref.send_message(
                     chat_id=cfg["telegram"]["admin_chat_id"],
-                    text=f"⚡ Auto-aprobada — {resolved} {signal.direction} @ {signal.price}\n📢 Canal: {channel_name}",
+                    text=f"⚡ Auto-aprobada — {resolved} {signal.direction} @ {signal.price}\n📢 Instrumento: {channel_name}",
                 )
         elif signal.type == SignalType.CLOSE:
             close_confirm = cfg["trading"].get("close_requires_confirmation", False)
@@ -761,7 +761,7 @@ def _make_handler(client: TelegramClient):
                 _add_log(f"CLOSE automático → EA — {resolved}")
                 await _bot_ref.send_message(
                     chat_id=cfg["telegram"]["admin_chat_id"],
-                    text=f"🔴 Cierre automático enviado al EA — {resolved}\n📢 Canal: {channel_name}",
+                    text=f"🔴 Cierre automático enviado al EA — {resolved}\n📢 Instrumento: {channel_name}",
                 )
     return on_message
 
@@ -793,8 +793,8 @@ async def run_telethon(bot: Bot):
     me = await client.get_me()
     log.info("Telethon conectado como %s", me.username)
     telethon_connected = True
-    _add_log(f"Telethon conectado como @{me.username}")
-    await _alert(f"✅ MevoTrader online — Telethon conectado como @{me.username}")
+    _add_log(f"TradingView conectado como @{me.username}")
+    await _alert(f"✅ MevoTrader online — TradingView conectado como @{me.username}")
 
     all_channels = cfg["telegram"]["source_channel"] + list(extra_channels.keys())
     client.add_event_handler(_make_handler(client), events.NewMessage(chats=all_channels))
@@ -822,13 +822,13 @@ async def run_telethon_with_retry(bot: Bot):
 
             # run_telethon retornó = desconexión limpia
             log.warning("Telethon desconectado (salida limpia)")
-            _add_log("⚠️ Telethon desconectado — reconectando...")
-            await _alert(f"⚠️ MevoTrader: Telethon desconectado.\nReconectando en {delay}s...")
+            _add_log("⚠️ TradingView desconectado — reconectando...")
+            await _alert(f"⚠️ MevoTrader: TradingView desconectado.\nReconectando en {delay}s...")
 
         except Exception as e:
             log.error("Telethon error: %s", e)
-            _add_log(f"❌ Telethon error: {type(e).__name__}")
-            await _alert(f"❌ MevoTrader: Telethon falló ({type(e).__name__})\nReconectando en {delay}s...")
+            _add_log(f"❌ TradingView error: {type(e).__name__}")
+            await _alert(f"❌ MevoTrader: TradingView falló ({type(e).__name__})\nReconectando en {delay}s...")
 
         finally:
             telethon_connected = False

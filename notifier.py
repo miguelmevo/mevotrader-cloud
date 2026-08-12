@@ -28,7 +28,7 @@ def desktop_notification(title: str, body: str, subtitle: str = ""):
 def format_open_message(signal: Signal, resolved_symbol: str, lots: float, channel_name: str = "") -> str:
     sl_str = f"\nSL: `{signal.sl}`" if signal.sl else ""
     tp_str = f"\nTP: `{signal.tp}`" if signal.tp else ""
-    ch_str = f"\n📢 Canal: *{channel_name}*" if channel_name and channel_name != "—" else ""
+    ch_str = f"\n📢 Instrumento: *{channel_name}*" if channel_name and channel_name != "—" else ""
     return (
         f"📡 *NUEVA ALERTA — {signal.trader}*\n\n"
         f"*{resolved_symbol}* — `{signal.direction}`\n"
@@ -42,7 +42,7 @@ def format_open_message(signal: Signal, resolved_symbol: str, lots: float, chann
 def format_close_message(signal: Signal, resolved_symbol: str, channel_name: str = "") -> str:
     pips_str = f"{signal.pips:+.1f} pips" if signal.pips is not None else "—"
     profit_str = signal.profit or "—"
-    ch_str = f"\n📢 Canal: *{channel_name}*" if channel_name and channel_name != "—" else ""
+    ch_str = f"\n📢 Instrumento: *{channel_name}*" if channel_name and channel_name != "—" else ""
     return (
         f"🔴 *CIERRE — {signal.trader}*\n\n"
         f"*{resolved_symbol}* — `{signal.direction}`\n"
