@@ -280,12 +280,12 @@ async function toggleChannel(id) {
     const btn = document.getElementById('toggle-' + id);
     if (!btn) return;
     if (isMobile()) {
-      btn.textContent = data.active ? '●' : '⏸';
+      btn.textContent = data.active ? '●' : '❙❙';
       btn.style.borderColor = data.active ? '#238636' : '#6e2e2e';
       btn.style.background  = data.active ? '#0d2818' : '#2d1117';
       btn.style.color       = data.active ? '#3fb950' : '#f85149';
     } else {
-      btn.textContent = data.active ? '● Activo' : '⏸ Pausado';
+      btn.textContent = data.active ? '● Activo' : '❙❙ Pausado';
       btn.style.borderColor = data.active ? '#238636' : '#6e2e2e';
       btn.style.background  = data.active ? '#0d2818' : '#2d1117';
       btn.style.color       = data.active ? '#3fb950' : '#f85149';
@@ -355,7 +355,7 @@ async function loadChannels() {
       const toggleBtn = isDynamic ? (mob ? `
         <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
           style="padding:3px 8px;font-size:14px;border-radius:6px;border:1px solid ${active ? '#238636' : '#6e2e2e'};background:${active ? '#0d2818' : '#2d1117'};color:${active ? '#3fb950' : '#f85149'};cursor:pointer;line-height:1">
-          ${active ? '●' : '⏸'}
+          ${active ? '●' : '❙❙'}
         </button>
         <button onclick="event.stopPropagation();removeChannel(${ch.id})"
           style="background:none;border:none;cursor:pointer;font-size:18px;padding:0;line-height:1;margin-left:4px">
@@ -363,7 +363,7 @@ async function loadChannels() {
         </button>` : `
         <button onclick="event.stopPropagation();toggleChannel(${ch.id})" id="toggle-${ch.id}"
           style="padding:4px 10px;font-size:12px;border-radius:6px;border:1px solid ${active ? '#238636' : '#6e2e2e'};background:${active ? '#0d2818' : '#2d1117'};color:${active ? '#3fb950' : '#f85149'};cursor:pointer">
-          ${active ? '● Activo' : '⏸ Pausado'}
+          ${active ? '● Activo' : '❙❙ Pausado'}
         </button>
         <button class="danger" style="padding:4px 10px;font-size:12px;margin-left:4px" onclick="event.stopPropagation();removeChannel(${ch.id})">Quitar</button>`) :
         (mob ? '' : '<span style="font-size:11px;color:#8b949e">Railway var</span>');
