@@ -350,7 +350,7 @@ async def api_toggle_channel(channel_id: int, secret: str = Query(...)):
     extra_channels[channel_id]["active"] = not extra_channels[channel_id].get("active", True)
     _save_extra_channels()
     active = extra_channels[channel_id]["active"]
-    _add_log(f"Instrumento {'activado' if active else 'pausado'}: {extra_channels[channel_id]['name']}")
+    _add_log(f"Instrumento {'activado' if active else 'pausado'}: {extra_channels[channel_id]['name']} [{str(abs(channel_id))[-5:]}]")
     return {"id": channel_id, "active": active}
 
 @app.get("/api/logs")
