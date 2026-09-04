@@ -342,14 +342,15 @@ def _parse_entrada_signal(text: str, m) -> Optional[Signal]:
 # ──────────────────────────────────────────
 
 _BE_RE = re.compile(
-    r'\b(cerrar\s+en\s+be|mover\s+(?:a\s+)?be|move\s+(?:to\s+)?be|'
+    r'\b(mover\s+(?:a\s+)?be|move\s+(?:to\s+)?be|'
     r'poner\s+(?:en\s+)?be|sl\s+(?:a\s+)?be|breakeven|break\s+even)\b',
     re.IGNORECASE
 )
 _BE_SOLO_RE  = re.compile(r'^\s*be\W{0,3}\s*$', re.IGNORECASE)
 
+# "cerrar en be" = cierre inmediato a mercado (no mueve SL, cierra ya)
 _CLOSE_NOW_RE = re.compile(
-    r'\b(close\s+(?:all|now|trade|it)|cerrar\s+(?:ahora|todo|ya)|'
+    r'\b(cerrar\s+en\s+be|close\s+(?:all|now|trade|it)|cerrar\s+(?:ahora|todo|ya)|'
     r'salir\s+(?:ya|ahora)|exit\s+(?:now|all)|close\s+it\s+now)\b',
     re.IGNORECASE
 )
