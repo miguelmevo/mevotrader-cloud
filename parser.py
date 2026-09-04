@@ -11,6 +11,8 @@ def normalize_symbol(raw: str) -> str:
 class SignalType(Enum):
     OPEN = "open"
     CLOSE = "close"
+    BE = "be"           # mover SL a precio de entrada
+    CLOSE_NOW = "close_now"  # cerrar a mercado inmediatamente
     UNKNOWN = "unknown"
 
 
@@ -333,6 +335,41 @@ def _parse_entrada_signal(text: str, m) -> Optional[Signal]:
         sl=sl, tp=tp,
         format="entrada_signal", raw_text=text,
     )
+
+
+# ──────────────────────────────────────────
+# Mensajes de gestión (BE, cierre inmediato)
+# ──────────────────────────────────────────
+
+_BE_RE = re.compile(
+    r'\b(cerrar\s+en\s+be|mover\s+(?:a\s+)?be|move\s+(?:to\s+)?be|'
+    r'poner\s+(?:en\s+)?be|sl\s+(?:a\s+)?be|breakeven|break\s+even)\b',
+    re.IGNORECASE
+)
+_BE_SOLO_RE  = re.compile(r'^\s*be\W{0,3}\s*$', re.IGNORECASE)
+
+_CLOSE_NOW_RE = re.compile(
+    r'\b(close\s+(?:all|now|trade|it)|cerrar\s+(?:ahora|todo|ya)|'
+    r'salir\s+(?:ya|ahora)|exit\s+(?:now|all)|close\s+it\s+now)\b',
+    re.IGNORECASE
+)
+
+
+def parse_management_message(text: str) -> Optional[SignalType]:
+    """
+    Detecta mensajes cortos de gestión (BE o cierre inmediato) sin símbolo explícito.
+    Solo aplica si el texto es ≤ 120 chars y no contiene dirección de trading.
+    """
+    t = text.strip()
+    if len(t) > 120:
+        return None
+    if re.search(r'\b(BUY|SELL|COMPRAR|VENDER|LONG|SHORT)\b', t, re.IGNORECASE):
+        return None
+    if _BE_RE.search(t) or _BE_SOLO_RE.match(t):
+        return SignalType.BE
+    if _CLOSE_NOW_RE.search(t):
+        return SignalType.CLOSE_NOW
+    return None
 
 
 # ──────────────────────────────────────────

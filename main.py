@@ -21,7 +21,7 @@ from telethon import TelegramClient, events
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes
 
-from parser import Signal, SignalType, parse_message
+from parser import Signal, SignalType, parse_message, parse_management_message
 import notifier
 
 logging.basicConfig(
@@ -86,8 +86,9 @@ def load_config() -> dict:
 # -------------------------------------------------------------------
 # Estado global
 # -------------------------------------------------------------------
-pending_for_user: dict[str, dict] = {}
-pending_for_ea:   Optional[dict]  = None
+pending_for_user:    dict[str, dict] = {}
+pending_for_ea:      Optional[dict]  = None
+last_open_by_channel: dict[int, dict] = {}  # {channel_id: signal_data} — última posición abierta por canal
 last_signal:      Optional[dict]  = None
 signal_history:   deque           = deque(maxlen=20)
 signals_today:    int             = 0
@@ -726,6 +727,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pending_for_ea = signal_data
     last_signal = signal_data
     signals_executed += 1
+    ch_id = signal_data.get("channel_id")
+    if ch_id and signal_data.get("action") == "open":
+        last_open_by_channel[int(ch_id)] = signal_data
     _add_log(f"APROBADA — {signal_data['symbol']} {signal_data.get('direction','')} → enviada al EA")
     await query.edit_message_text(
         f"✅ Aprobada — {signal_data['symbol']} {signal_data['direction']}\n"
@@ -744,7 +748,39 @@ def _make_handler(client: TelegramClient):
             return
         text   = event.raw_text
         signal = await parse_signal(text)
+
+        # Si no es señal de entrada, intentar como mensaje de gestión (BE / cierre)
         if not signal:
+            mgmt_type = parse_management_message(text)
+            if mgmt_type in (SignalType.BE, SignalType.CLOSE_NOW):
+                # Buscar la última posición abierta de este canal
+                ref = last_open_by_channel.get(chat_id) or last_open_by_channel.get(_normalize_id(chat_id))
+                if ref:
+                    now = datetime.utcnow()
+                    action_str = "be" if mgmt_type == SignalType.BE else "close_now"
+                    label      = "BE" if mgmt_type == SignalType.BE else "CIERRE"
+                    mgmt_signal = {
+                        "id":         str(uuid.uuid4())[:8],
+                        "action":     action_str,
+                        "symbol":     ref["symbol"],
+                        "direction":  ref.get("direction", ""),
+                        "channel_id": ref.get("channel_id", 0),
+                        "sl": 0.0, "tp": 0.0, "pe": 0.0, "pe_low": 0.0,
+                        "status":     "auto-aprobada",
+                        "time":       now.strftime("%H:%M"),
+                        "datetime":   now.strftime("%d/%m/%Y %H:%M"),
+                    }
+                    global pending_for_ea
+                    pending_for_ea = mgmt_signal
+                    norm_id = _normalize_id(chat_id)
+                    ch_name = ref.get("channel", str(norm_id))
+                    _add_log(f"{label} → {ref['symbol']} [{str(norm_id)[-5:]}]")
+                    await _bot_ref.send_message(
+                        chat_id=cfg["telegram"]["admin_chat_id"],
+                        text=f"{'🔁' if mgmt_type == SignalType.BE else '🔴'} {label} automático → {ref['symbol']}\n📢 Instrumento: {ch_name}",
+                    )
+                else:
+                    log.info("Gestión '%s' ignorada — sin posición abierta registrada para canal %s", mgmt_type, chat_id)
             return
 
         symbol_suffix = cfg["mt5"].get("symbol_suffix", "")
@@ -788,6 +824,7 @@ def _make_handler(client: TelegramClient):
                 signal_history.append(pending_for_ea)
                 signals_today += 1
                 signals_executed += 1
+                last_open_by_channel[chat_id] = pending_for_ea
                 _update_channel_stats(chat_id, pending_for_ea)
                 _add_log(f"AUTO-APROBADA {resolved} {signal.direction} [{str(norm_id)[-5:]}]")
                 await _bot_ref.send_message(

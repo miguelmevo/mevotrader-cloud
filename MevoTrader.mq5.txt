@@ -15,8 +15,8 @@ enum ENUM_BE_MODE  { BE_BY_RR=0,  BE_BY_USD=1   };
 
 //--- Inputs
 input group "═══ SERVIDOR EN LA NUBE ═══"
-input string CloudURL          = "https://web-production-80ce.up.railway.app"; // URL del servidor Railway
-input string EA_Secret         = "mevo2024secretkey";                           // Clave secreta compartida
+input string CloudURL          = "https://tu-app.railway.app"; // URL del servidor Railway
+input string EA_Secret         = "CAMBIA_ESTO";                // Clave secreta compartida
 input int    PollSeconds       = 5;                            // Segundos entre cada consulta
 
 input group "═══ INSTRUMENTOS ═══"
@@ -150,6 +150,19 @@ void PollServer()
 
    if(action == "close") {
       ClosePositions(broker_symbol, channel_id);
+      AckSignal(signal_id);
+      return;
+   }
+
+   if(action == "be") {
+      MoveToBreakeven(broker_symbol, channel_id, signal_id);
+      AckSignal(signal_id);
+      return;
+   }
+
+   if(action == "close_now") {
+      ClosePositions(broker_symbol, channel_id);
+      ReportResult(signal_id, true, "Cerrado manualmente");
       AckSignal(signal_id);
       return;
    }
@@ -373,6 +386,36 @@ void ReportResult(string signal_id, bool executed, string detail, ulong ticket=0
 string ChShort(string ch) {
    int len = StringLen(ch);
    return (len > 5) ? StringSubstr(ch, len - 5) : ch;
+}
+
+void MoveToBreakeven(string symbol, string channel_id, string signal_id)
+{
+   string target = (channel_id != "") ? "MEVO_" + ChShort(channel_id) : "";
+   int modified = 0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--) {
+      if(!PosInfo.SelectByIndex(i)) continue;
+      if(PosInfo.Magic() != MagicNumber) continue;
+      if(PosInfo.Symbol() != symbol) continue;
+      if(target != "" && StringFind(PosInfo.Comment(), target) < 0) continue;
+
+      double entry     = PosInfo.PriceOpen();
+      double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+      if(tick_size <= 0) tick_size = 0.00001;
+
+      if(MathAbs(PosInfo.StopLoss() - entry) < tick_size) continue; // ya está en BE
+
+      if(Trade.PositionModify(PosInfo.Ticket(), entry, PosInfo.TakeProfit()))
+         modified++;
+      else
+         Print("Error BE ticket=", PosInfo.Ticket(), " err=", GetLastError());
+   }
+   Print("BE procesado: ", modified, " posicion(es) de ", symbol);
+   if(signal_id != "") {
+      if(modified > 0)
+         ReportResult(signal_id, true, "BE aplicado (" + IntegerToString(modified) + ")");
+      else
+         ReportResult(signal_id, false, "Sin posiciones para BE");
+   }
 }
 
 void ClosePositions(string symbol, string channel_id)
